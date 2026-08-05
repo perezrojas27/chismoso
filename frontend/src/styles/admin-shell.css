@@ -1,0 +1,255 @@
+/**
+ * Puente: tokens Albatros → variables liquid-glass existentes.
+ * Importar después de tokens-diseno-albatros.css y antes de liquid-glass.css.
+ */
+
+body.albatros-admin {
+  --accent: var(--nc-blue, #0082c9);
+  --accent-deep: var(--nc-blue-dark, #00629a);
+  --accent-glow: rgba(0, 130, 201, 0.28);
+  --bg-deep: var(--bg, #0f1117);
+  --bg-mid: var(--surface, #1a1d27);
+  --ink: var(--text, #dde1ed);
+  --ink-soft: var(--text-muted, #7a82a0);
+  --font: var(--font-sans, 'Inter', system-ui, sans-serif);
+  --badge-bg: var(--accent-soft, rgba(0, 130, 201, 0.12));
+  --badge-ink: var(--nc-blue, #0082c9);
+  --row-hover: rgba(0, 130, 201, 0.08);
+}
+
+/* Shell admin: sidebar + main */
+.admin-frame {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg, #0f1117);
+  color: var(--text, #dde1ed);
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+}
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem 1rem;
+  background: var(--surface, #1a1d27);
+  border-right: 1px solid var(--border, #2a2f3e);
+}
+
+.admin-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.admin-sidebar__logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.admin-sidebar__brand-text {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted, #7a82a0);
+  line-height: 1.25;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.admin-nav__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: var(--radius, 10px);
+  background: transparent;
+  color: var(--text-muted, #7a82a0);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-nav__btn:hover {
+  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
+  color: var(--text, #dde1ed);
+}
+
+.admin-nav__btn.is-active {
+  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
+  color: var(--accent, #0082c9);
+}
+
+.admin-nav__icon {
+  font-size: 1.1rem;
+  width: 1.4rem;
+  text-align: center;
+}
+
+.admin-sidebar__foot {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #7a82a0);
+  border-top: 1px solid var(--border, #2a2f3e);
+  padding-top: 0.85rem;
+}
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 64px;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--border, #2a2f3e);
+  background: var(--surface, #1a1d27);
+  flex-shrink: 0;
+}
+
+.admin-topbar__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text, #dde1ed);
+}
+
+.admin-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.admin-topbar__user {
+  font-size: 0.8rem;
+  color: var(--text-muted, #7a82a0);
+  margin-right: 0.35rem;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 1.25rem 1.5rem 2rem;
+  overflow: auto;
+}
+
+/* En shell admin, el layout interno no necesita brand-bar duplicada */
+.admin-content .app-shell {
+  min-height: auto;
+  background: transparent;
+}
+
+.admin-content .atmosphere {
+  display: none;
+}
+
+.admin-content .layout {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 1rem;
+}
+
+.admin-content .brand-bar,
+.admin-content .segmented:not(.segmented--periods):not(.segmented--half) {
+  display: none;
+}
+
+.btn-hub,
+.btn-logout {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2a2f3e);
+  background: var(--surface2, #232733);
+  color: var(--text, #dde1ed);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-hub:hover,
+.btn-logout:hover {
+  border-color: var(--accent, #0082c9);
+  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.status-chip--compact {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.65rem;
+}
+
+@media (max-width: 860px) {
+  .admin-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-right: none;
+    border-bottom: 1px solid var(--border, #2a2f3e);
+  }
+
+  .admin-nav {
+    flex-direction: row;
+    flex: 1 1 auto;
+  }
+
+  .admin-nav__btn {
+    width: auto;
+    flex: 1;
+    justify-content: center;
+  }
+
+  .admin-sidebar__foot {
+    display: none;
+  }
+
+  .admin-topbar {
+    height: auto;
+    min-height: 56px;
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-content {
+    padding: 1rem;
+  }
+}

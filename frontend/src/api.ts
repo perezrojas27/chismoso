@@ -1,0 +1,307 @@
+import { authHeaders } from './portalAuth'
+
+const API = '/api/biometrico'
+
+export type AttendanceRow = {
+  date: string
+  employee_id: string
+  employee_name: string
+  department: string
+  first_seen_at: string
+  last_seen_at: string | null
+}
+
+export type AttendanceReport = {
+  from_date: string
+  to_date: string
+  rows: AttendanceRow[]
+}
+
+export type CafeteriaEmployee = {
+  employee_id: string
+  employee_name: string
+  department: string
+  marked_time: string
+  observation?: string
+  has_exception?: boolean
+}
+
+export type CafeteriaReport = {
+  date: string
+  cutoff: string
+  headcount: number
+  employees: CafeteriaEmployee[]
+  exceptions_count?: number
+}
+
+export type DeviceSearchSample = {
+  employee_id: string
+  employee_name: string
+  timestamp: string
+}
+
+export type DeviceSearchResult = {
+  date: string
+  total_matches: number
+  sample_count: number
+  samples: DeviceSearchSample[]
+  message: string
+}
+
+export type DeviceHealth = {
+  device_id: string
+  host: string
+  port?: number
+  location?: string
+  reachable: boolean | null
+  auth_ok?: boolean | null
+  error: string | null
+  online?: boolean | null
+  connection_established?: boolean
+  configured?: boolean
+  status_message?: string
+  suggested_id?: string
+  device_label?: string | null
+  search?: DeviceSearchResult | null
+  origin?: 'env' | 'managed' | 'discovered'
+  removable?: boolean
+}
+
+export type DevicesResponse = {
+  status: string
+  source: string
+  user: string
+  use_https: boolean
+  cafeteria_cutoff: string
+  cafeteria_late_end: string
+  devices: DeviceHealth[]
+  devices_ok: number
+  devices_total: number
+  message?: string
+}
+
+export type HealthResponse = {
+  status: string
+  source: string
+  device_id: string
+  cafeteria_cutoff: string
+  devices?: DeviceHealth[]
+  devices_ok?: number
+  devices_total?: number
+  auth_disabled?: boolean
+  client_id?: string
+}
+
+async function parseError(res: Response): Promise<string> {
+  try {
+    const data = await res.json()
+    if (data?.detail?.message) return data.detail.message as string
+    if (typeof data?.detail === 'string') return data.detail
+    if (Array.isArray(data?.detail)) {
+      return data.detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join('; ')
+    }
+    return res.statusText || 'Error de API'
+  } catch {
+    return res.statusText || 'Error de API'
+  }
+}
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers = authHeaders(init?.headers)
+  return fetch(`${API}${path}`, { ...init, headers })
+}
+
+export async function fetchHealth(): Promise<HealthResponse> {
+  const res = await apiFetch('/health')
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchDevices(): Promise<DevicesResponse> {
+  const res = await apiFetch('/devices')
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function createDevice(body: {
+  host: string
+  port: number
+  location?: string
+  device_id?: string
+}): Promise<{ device: { device_id: string; host: string; port: number; location?: string }; message: string }> {
+  const res = await apiFetch('/devices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function deleteDevice(deviceId: string): Promise<{ message: string }> {
+  const res = await apiFetch(`/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export type SiteInfo = {
+  id: string
+  code: string
+  name: string
+  timezone: string
+  status: string
+  cafeteria_cutoff?: string
+  cafeteria_late_end?: string
+}
+
+export type SitesResponse = {
+  current_site_id: string
+  site_code: string
+  sites: SiteInfo[]
+  agent_version: string
+}
+
+export async function fetchSites(): Promise<SitesResponse> {
+  const res = await apiFetch('/edge/sites')
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+function withSite(params: URLSearchParams, siteId?: string | null) {
+  if (siteId) params.set('site_id', siteId)
+  return params
+}
+
+export async function fetchAttendance(
+  fromDate: string,
+  toDate: string,
+  siteId?: string | null,
+): Promise<AttendanceReport> {
+  const params = withSite(
+    new URLSearchParams({ from_date: fromDate, to_date: toDate }),
+    siteId,
+  )
+  const res = await apiFetch(`/reports/attendance?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchCafeteria(
+  date: string,
+  siteId?: string | null,
+): Promise<CafeteriaReport> {
+  const params = withSite(new URLSearchParams({ date }), siteId)
+  const res = await apiFetch(`/reports/cafeteria?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchAttendancePdfBlob(
+  fromDate: string,
+  toDate: string,
+  siteId?: string | null,
+): Promise<Blob> {
+  const params = withSite(
+    new URLSearchParams({ from_date: fromDate, to_date: toDate }),
+    siteId,
+  )
+  const res = await apiFetch(`/reports/attendance/pdf?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.blob()
+}
+
+export async function fetchCafeteriaPdfBlob(
+  date: string,
+  siteId?: string | null,
+): Promise<Blob> {
+  const params = withSite(new URLSearchParams({ date }), siteId)
+  const res = await apiFetch(`/reports/cafeteria/pdf?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.blob()
+}
+
+export type CafeteriaException = {
+  employee_id: string
+  date: string
+  reason: string
+  registered_by: string
+}
+
+export type LateCandidate = {
+  employee_id: string
+  employee_name: string
+  department: string
+  marked_time: string
+  has_exception: boolean
+}
+
+export async function fetchCafeteriaExceptions(date: string): Promise<CafeteriaException[]> {
+  const params = new URLSearchParams({ date })
+  const res = await apiFetch(`/exceptions/cafeteria?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchLateCandidates(date: string): Promise<LateCandidate[]> {
+  const params = new URLSearchParams({ date })
+  const res = await apiFetch(`/exceptions/cafeteria/candidates?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function createCafeteriaException(body: {
+  employee_id: string
+  date: string
+  reason: string
+}): Promise<CafeteriaException> {
+  const res = await apiFetch('/exceptions/cafeteria', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, registered_by: 'GTH' }),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function deleteCafeteriaException(date: string, employeeId: string): Promise<void> {
+  const params = new URLSearchParams({ date, employee_id: employeeId })
+  const res = await apiFetch(`/exceptions/cafeteria?${params}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await parseError(res))
+}
+
+export function todayISO(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Fecha visible: día/mes/año (ej. 15/07/2026). Acepta YYYY-MM-DD o ISO. */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const raw = value.includes('T') ? value.slice(0, 10) : value.slice(0, 10)
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${day}/${month}/${d.getFullYear()}`
+}
+
+export function formatTime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    const part = iso.includes('T') ? iso.split('T')[1] : iso
+    return part.slice(0, 8)
+  }
+  return d.toLocaleTimeString('es-VE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
