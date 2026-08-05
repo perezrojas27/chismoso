@@ -15,10 +15,16 @@ Ver `docs/ARQUITECTURA_EDGE_CLOUD.md`.
 
 ```bash
 cd backend
-..\.\.venv\Scripts\activate   # Windows
+# Activar entorno (Windows): ..\.\.venv\Scripts\activate
+# Activar entorno (Linux): source .venv/bin/activate
 pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8003
+# Configuración inicial: copy .env.example .env (Windows) / cp .env.example .env (Linux)
+
+# Arrancar Agente Edge (Puerto 8003)
+uvicorn edge_app.main:app --reload --host 0.0.0.0 --port 8003
+
+# Arrancar Cloud App / Reportes (Puerto 8004)
+uvicorn cloud_app.main:app --reload --host 0.0.0.0 --port 8004
 
 cd frontend
 npm install
