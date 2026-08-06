@@ -1,4 +1,9 @@
-# Albatros Biométrico
+# Albatros Biométrico (Chismoso)
+
+> **2026-08-06 — Integrado en el monorepo Albatros INTEGRADO.**  
+> Desarrollo y deploys: [`jpvalor-pololo/INTEGRADO`](https://github.com/jpvalor-pololo/INTEGRADO) → `modulos/biometrico/`.  
+> Handoff: [`HANDOFF_INTEGRADO_20260806.md`](HANDOFF_INTEGRADO_20260806.md).
+
 
 Módulo de **asistencia / comedor** para Albatros INTEGRADO. Fuente de marcajes: **ISAPI Hikvision** (no OpenAPI HikCentral).
 
@@ -9,7 +14,7 @@ Ver `docs/ARQUITECTURA_EDGE_CLOUD.md`.
 
 - Backend: Python · FastAPI · httpx (Digest) · SQLite (store local)
 - Frontend: Vite · React · TypeScript
-- Roles: `servicios_generales` · `gth` · `admin`
+- Roles INTEGRADO: `servicios_generales` · `gth` · `admin` (`client_id=biometrico`)
 
 ## Arranque rápido
 
