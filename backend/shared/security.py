@@ -8,13 +8,14 @@ Roles del módulo biométrico:
 
 En local: AUTH_DISABLED=true omite validación (desarrollo).
 En portal: mismo JWT_SECRET_KEY que integrado-backend.
+Token: Authorization Bearer o cookie HttpOnly albatros_token.
 """
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
@@ -22,6 +23,7 @@ from shared.config import Settings, get_settings
 
 EXPECTED_ISS = "albatros_auth_integrado"
 APP_CLIENT_ID = "biometrico"
+SESSION_COOKIE_NAME = "albatros_token"
 
 # Roles canónicos + alias legacy del seed anterior
 ROLE_SERVICIOS = "servicios_generales"
@@ -92,7 +94,33 @@ def _has_any_app_role(payload: dict[str, Any], *allowed: str) -> bool:
     return bool(roles & _expand_allowed(*allowed))
 
 
+def _extract_raw_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    if credentials and credentials.credentials:
+        return credentials.credentials.strip()
+    cookie = (request.cookies.get(SESSION_COOKIE_NAME) or "").strip()
+    return cookie or None
+
+
+def _touch_session_if_configured(payload: dict[str, Any], settings: Settings) -> None:
+    """Si hay DATABASE_URL, valida idle/revocación vía core.touch_auth_session."""
+    db_url = (settings.database_url or "").strip()
+    if not db_url:
+        return
+    from shared.database import SessionLocal
+    from shared.session_touch import assert_auth_session_sync
+
+    db = SessionLocal()
+    try:
+        assert_auth_session_sync(db, payload)
+    finally:
+        db.close()
+
+
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
@@ -109,12 +137,14 @@ async def get_current_user(
             "dev": True,
         }
 
-    if credentials is None or not credentials.credentials:
+    token = _extract_raw_token(request, credentials)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token ausente",
         )
-    payload = decode_access_token(credentials.credentials, settings)
+    payload = decode_access_token(token, settings)
+    _touch_session_if_configured(payload, settings)
     return {"payload": payload, "dev": False}
 
 

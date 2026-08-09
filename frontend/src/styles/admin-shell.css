@@ -1,201 +1,107 @@
 /**
- * Puente: tokens Albatros → variables liquid-glass existentes.
- * Importar después de tokens-diseno-albatros.css y antes de liquid-glass.css.
+ * Puente SPA biométrico → shell canónico INTEGRADO.
+ * Layout real: integrado-components.css + integrado-admin-shell.css.
+ * Aquí solo #root flex + utilidades de paneles/controles del módulo.
  */
 
-body.albatros-admin {
-  --accent: var(--nc-blue, #0082c9);
-  --accent-deep: var(--nc-blue-dark, #00629a);
-  --accent-glow: rgba(0, 130, 201, 0.28);
-  --bg-deep: var(--bg, #0f1117);
-  --bg-mid: var(--surface, #1a1d27);
-  --ink: var(--text, #dde1ed);
-  --ink-soft: var(--text-muted, #7a82a0);
-  --font: var(--font-sans, 'Inter', system-ui, sans-serif);
-  --badge-bg: var(--accent-soft, rgba(0, 130, 201, 0.12));
-  --badge-ink: var(--nc-blue, #0082c9);
-  --row-hover: rgba(0, 130, 201, 0.08);
-}
-
-/* Shell admin: sidebar + main */
-.admin-frame {
-  display: grid;
-  grid-template-columns: 240px 1fr;
+body.albatros-admin #root {
+  display: flex;
+  flex: 1;
+  width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg, #0f1117);
-  color: var(--text, #dde1ed);
-  font-family: var(--font-sans, Inter, system-ui, sans-serif);
 }
 
-.admin-sidebar {
+body.albatros-admin #root > .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.25rem 1rem;
-  background: var(--surface, #1a1d27);
-  border-right: 1px solid var(--border, #2a2f3e);
 }
 
-.admin-sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.25rem 0.5rem;
-}
-
-.admin-sidebar__logo {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-}
-
-.admin-sidebar__brand-text {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-muted, #7a82a0);
-  line-height: 1.25;
-}
-
-.admin-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  flex: 1;
-}
-
-.admin-nav__btn {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  border: none;
-  border-radius: var(--radius, 10px);
-  background: transparent;
-  color: var(--text-muted, #7a82a0);
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.admin-nav__btn:hover {
-  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
-  color: var(--text, #dde1ed);
-}
-
-.admin-nav__btn.is-active {
-  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
-  color: var(--accent, #0082c9);
-}
-
-.admin-nav__icon {
-  font-size: 1.1rem;
-  width: 1.4rem;
-  text-align: center;
-}
-
-.admin-sidebar__foot {
-  padding: 0.5rem;
-  font-size: 0.75rem;
+body.albatros-admin #root .sidebar-foot {
+  margin-top: auto;
+  padding: 0.75rem 1rem;
+  font-size: 0.72rem;
   color: var(--text-muted, #7a82a0);
   border-top: 1px solid var(--border, #2a2f3e);
-  padding-top: 0.85rem;
 }
 
-.admin-main {
+/* Paneles operativos del módulo (contenido, no shell) */
+.albatros-admin .glass.panel,
+.albatros-admin .panel {
+  background: color-mix(in srgb, var(--surface, rgba(255, 255, 255, 0.05)) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, var(--accent, #0082c9));
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+.albatros-admin .panel__title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.albatros-admin .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.albatros-admin .field {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
+  gap: 0.3rem;
+  min-width: 9rem;
 }
 
-.admin-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  height: 64px;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid var(--border, #2a2f3e);
-  background: var(--surface, #1a1d27);
-  flex-shrink: 0;
-}
-
-.admin-topbar__title {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: var(--text, #dde1ed);
-}
-
-.admin-topbar__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-}
-
-.admin-topbar__user {
-  font-size: 0.8rem;
-  color: var(--text-muted, #7a82a0);
-  margin-right: 0.35rem;
-}
-
-.admin-content {
-  flex: 1;
-  padding: 1.25rem 1.5rem 2rem;
-  overflow: auto;
-}
-
-/* En shell admin, el layout interno no necesita brand-bar duplicada */
-.admin-content .app-shell {
-  min-height: auto;
-  background: transparent;
-}
-
-.admin-content .atmosphere {
-  display: none;
-}
-
-.admin-content .layout {
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  gap: 1rem;
-}
-
-.admin-content .brand-bar,
-.admin-content .segmented:not(.segmented--periods):not(.segmented--half) {
-  display: none;
-}
-
-.btn-hub,
-.btn-logout {
-  padding: 0.4rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid var(--border, #2a2f3e);
-  background: var(--surface2, #232733);
-  color: var(--text, #dde1ed);
-  font: inherit;
-  font-size: 0.8rem;
+.albatros-admin .field label {
+  font-size: 0.75rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  color: var(--text-muted, #7a82a0);
 }
 
-.btn-hub:hover,
-.btn-logout:hover {
-  border-color: var(--accent, #0082c9);
-  background: var(--accent-soft, rgba(0, 130, 201, 0.12));
+.albatros-admin .field input,
+.albatros-admin .field select,
+.albatros-admin .dev-role select {
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text, #dde1ed);
+  background: var(--bg, #0f1117);
+  border: 1px solid var(--border, #2a2f3e);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
 }
 
-.visually-hidden {
+.albatros-admin .status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #7a82a0);
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border, #2a2f3e);
+  background: var(--surface2, rgba(255, 255, 255, 0.04));
+}
+
+.albatros-admin .status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--success, #3ecf8e);
+}
+
+.albatros-admin .status-dot--warn {
+  background: var(--warning, #e8a838);
+}
+
+.albatros-admin .status-dot--bad {
+  background: var(--danger, #e85d5d);
+}
+
+.albatros-admin .visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -207,49 +113,103 @@ body.albatros-admin {
   border: 0;
 }
 
-.status-chip--compact {
-  font-size: 0.75rem;
-  padding: 0.3rem 0.65rem;
+.albatros-admin .layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-@media (max-width: 860px) {
-  .admin-frame {
-    grid-template-columns: 1fr;
-  }
+.albatros-admin .btn.btn--primary,
+.albatros-admin .btn--primary {
+  background: var(--accent, #0082c9);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 
-  .admin-sidebar {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border-right: none;
-    border-bottom: 1px solid var(--border, #2a2f3e);
-  }
+.albatros-admin .btn.btn--ghost,
+.albatros-admin .btn--ghost {
+  background: transparent;
+  color: var(--text, #dde1ed);
+  border: 1px solid var(--border, #2a2f3e);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
 
-  .admin-nav {
-    flex-direction: row;
-    flex: 1 1 auto;
-  }
+.albatros-admin .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
-  .admin-nav__btn {
-    width: auto;
-    flex: 1;
-    justify-content: center;
-  }
+.albatros-admin .devices-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
 
-  .admin-sidebar__foot {
-    display: none;
-  }
+.albatros-admin .devices-panel__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #7a82a0);
+}
 
-  .admin-topbar {
-    height: auto;
-    min-height: 56px;
-    padding: 0.75rem 1rem;
-    flex-wrap: wrap;
-  }
+.albatros-admin .devices-panel__title {
+  margin: 0.2rem 0;
+  font-size: 1.05rem;
+}
 
-  .admin-content {
-    padding: 1rem;
-  }
+.albatros-admin .devices-panel__lead {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #7a82a0);
+  max-width: 40rem;
+}
+
+.albatros-admin .devices-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.albatros-admin .period-anchor-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted, #7a82a0);
+  margin: 0.35rem 0 0;
+}
+
+.albatros-admin .banner-info,
+.albatros-admin .banner-warn,
+.albatros-admin .banner-error {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.albatros-admin .banner-info {
+  background: color-mix(in srgb, var(--accent, #0082c9) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #0082c9) 35%, transparent);
+}
+
+.albatros-admin .banner-warn {
+  background: color-mix(in srgb, var(--warning, #e8a838) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning, #e8a838) 35%, transparent);
+}
+
+.albatros-admin .banner-error {
+  background: color-mix(in srgb, var(--danger, #e85d5d) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger, #e85d5d) 35%, transparent);
 }

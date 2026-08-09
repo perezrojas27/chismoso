@@ -170,3 +170,65 @@ async def discover_unconfigured_hikvision(
 
     found.sort(key=lambda d: d["host"])
     return found
+
+
+def _candidates_from_seed(seed_host: str) -> list[tuple[str, int]]:
+    host = (seed_host or "").strip()
+    try:
+        ip = ip_address(host)
+    except ValueError:
+        return []
+    if not isinstance(ip, IPv4Address):
+        return []
+    parts = host.split(".")
+    if len(parts) != 4:
+        return []
+    prefix = ".".join(parts[:3])
+    base = int(parts[3])
+    seen: set[tuple[str, int]] = set()
+    # Incluye la propia semilla + vecindario amplio
+    for last in range(max(1, base - 30), min(254, base + 30) + 1):
+        for port in _PORTS:
+            seen.add((f"{prefix}.{last}", port))
+    return sorted(seen)
+
+
+async def discover_around_host(
+    settings: Settings,
+    seed_host: str,
+    configured: list[HikvisionDevice] | None = None,
+) -> list[dict]:
+    """Escaneo dirigido desde una IP semilla (consola de sede)."""
+    configured = configured or []
+    configured_hosts = {d.host.strip() for d in configured}
+    candidates = [
+        (h, p)
+        for h, p in _candidates_from_seed(seed_host)
+        if h not in configured_hosts
+    ]
+    if not candidates:
+        return []
+
+    logger.info(
+        "Escaneo ISAPI desde semilla %s: %s candidatos",
+        seed_host,
+        len(candidates),
+    )
+    results = await asyncio.gather(
+        *[
+            _probe_isapi_presence(h, p, settings.hikvision_use_https)
+            for h, p in candidates
+        ]
+    )
+    found: list[dict] = []
+    seen_hosts: set[str] = set()
+    for item in results:
+        if not item:
+            continue
+        host = item["host"]
+        if host in seen_hosts:
+            continue
+        seen_hosts.add(host)
+        found.append(item)
+    found.sort(key=lambda d: d["host"])
+    return found

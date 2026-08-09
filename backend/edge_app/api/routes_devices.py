@@ -1,24 +1,28 @@
-"""Administración de dispositivos biométricos (rol admin / TI)."""
+"""Administración de dispositivos biométricos en el agente edge (consola de sede)."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
-from shared.config import Settings, get_settings
-from shared.security import ROLES_DEVICES, require_roles
+from edge_app.api.routes_edge_admin import require_edge_console_auth
 from edge_app.services.device_registry import (
     ManagedDevice,
     ManagedDeviceCreate,
     get_device_registry,
     resolve_device_location,
 )
+from shared.config import Settings, get_settings
 
 router = APIRouter(
     prefix="/api/biometrico/devices",
     tags=["devices"],
-    dependencies=[Depends(require_roles(*ROLES_DEVICES))],
+    dependencies=[Depends(require_edge_console_auth)],
 )
+
+
+class ScanBody(BaseModel):
+    seed_host: str = Field(min_length=7, max_length=64)
 
 
 def _status_payload(
@@ -42,10 +46,14 @@ def _status_payload(
         status = "partial"
     return {
         "source": source,
-        "user": settings.hikvision_user,
+        "user": settings.effective_hikvision_user(),
         "use_https": settings.hikvision_use_https,
         "cafeteria_cutoff": settings.cafeteria_cutoff,
         "cafeteria_late_end": settings.cafeteria_late_end,
+        "isapi_password_configured": bool(
+            (settings.effective_hikvision_password() or "").strip()
+        ),
+        "read_only": False,
         "devices": devices,
         "devices_ok": ok,
         "devices_total": total,
@@ -137,7 +145,13 @@ async def list_devices(settings: Settings = Depends(get_settings)) -> dict:
             }
         )
 
+    seed = (settings.edge_scan_seed_host or settings.hikvision_host or "").strip()
     discovered = await discover_unconfigured_hikvision(settings, configured)
+    if seed and not discovered and not configured:
+        from edge_app.services.device_discovery import discover_around_host
+
+        discovered = await discover_around_host(settings, seed, configured)
+
     configured_hosts = {d.host for d in configured}
     for item in discovered:
         if item["host"] in configured_hosts:
@@ -158,11 +172,19 @@ async def list_devices(settings: Settings = Depends(get_settings)) -> dict:
 
     message = None
     if not devices:
-        message = "No hay dispositivos configurados ni detectados en la red."
+        message = (
+            "No hay dispositivos configurados ni detectados. "
+            "Use «Buscar en la red» con una IP cercana (ej. 192.168.10.200)."
+        )
     elif discovered_count:
         message = (
             f"{discovered_count} dispositivo(s) detectado(s) sin configurar. "
             "Agrégalos desde este panel para activar la conexión."
+        )
+    elif not (settings.effective_hikvision_password() or "").strip():
+        message = (
+            "Hay equipos listados, pero falta la contraseña ISAPI del reloj. "
+            "Guárdala en «Credenciales del reloj»."
         )
 
     payload = _status_payload(
@@ -176,9 +198,44 @@ async def list_devices(settings: Settings = Depends(get_settings)) -> dict:
     payload["configured_count"] = configured_count
     payload["discovered_count"] = discovered_count
     if discovered_count and ok == configured_count and configured_count > 0:
-        # Hay equipos OK pero también detectados fallidos → parcial
         payload["status"] = "partial"
     return payload
+
+
+@router.post("/scan")
+async def scan_network(
+    body: ScanBody,
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Busca relojes Hikvision alrededor de una IP semilla."""
+    from edge_app.services.device_discovery import discover_around_host
+    from edge_app.services.device_registry import device_id_from_host
+
+    configured = settings.parsed_hikvision_devices()
+    found = await discover_around_host(settings, body.seed_host.strip(), configured)
+    devices = []
+    for item in found:
+        suggested = device_id_from_host(item["host"])
+        devices.append(
+            {
+                **item,
+                "device_id": suggested,
+                "suggested_id": suggested,
+                "configured": False,
+                "location": resolve_device_location(suggested, host=item["host"])
+                or "Ubicación por definir",
+            }
+        )
+    return {
+        "seed_host": body.seed_host.strip(),
+        "found": len(devices),
+        "devices": devices,
+        "message": (
+            f"Se detectaron {len(devices)} equipo(s) cerca de {body.seed_host.strip()}."
+            if devices
+            else f"No se detectaron equipos cerca de {body.seed_host.strip()}."
+        ),
+    }
 
 
 @router.post("")

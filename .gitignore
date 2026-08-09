@@ -1,5 +1,11 @@
 .venv/
 backend/.env
+.env
+.env.deploy
+.env.*
+!.env.example
+!.env.edge-sede.example
+backend/.env.example
 backend/data/
 __pycache__/
 *.py[cod]
@@ -8,3 +14,4 @@ frontend/node_modules/
 frontend/dist/
 *.log
 .DS_Store
+deploy.tar.gz

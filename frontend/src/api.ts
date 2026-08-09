@@ -63,7 +63,7 @@ export type DeviceHealth = {
   suggested_id?: string
   device_label?: string | null
   search?: DeviceSearchResult | null
-  origin?: 'env' | 'managed' | 'discovered'
+  origin?: 'env' | 'managed' | 'discovered' | 'agent'
   removable?: boolean
 }
 
@@ -78,6 +78,7 @@ export type DevicesResponse = {
   devices_ok: number
   devices_total: number
   message?: string
+  read_only?: boolean
 }
 
 export type HealthResponse = {
@@ -108,7 +109,11 @@ async function parseError(res: Response): Promise<string> {
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = authHeaders(init?.headers)
-  return fetch(`${API}${path}`, { ...init, headers })
+  return fetch(`${API}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers,
+  })
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -269,6 +274,105 @@ export async function deleteCafeteriaException(date: string, employeeId: string)
   const params = new URLSearchParams({ date, employee_id: employeeId })
   const res = await apiFetch(`/exceptions/cafeteria?${params}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await parseError(res))
+}
+
+export type BioLinkageItem = {
+  employee_id: string
+  cedula: string
+  full_name: string
+  site_id: string | null
+  site_name: string
+  linked: boolean
+  person_external_id: string | null
+  linked_at: string | null
+  linked_by: string
+}
+
+export type BioPersonUnlinked = {
+  person_external_id: string
+  person_name: string
+  employee_code: string
+  event_count: number
+  last_seen: string | null
+  suggested_cedula_match: string
+}
+
+export type PresencePerson = {
+  employee_id: string
+  cedula: string
+  full_name: string
+  person_external_id: string | null
+}
+
+export type PresenceReport = {
+  date: string
+  core_site_id: string
+  biometric_site_ids: string[]
+  site_map_missing: boolean
+  expected_active: number
+  present: PresencePerson[]
+  absent: PresencePerson[]
+  unlinked_employees: PresencePerson[]
+  counts: { present: number; absent: number; unlinked: number }
+}
+
+export async function fetchBioLinkageActive(opts?: {
+  q?: string
+  link_filter?: 'all' | 'linked' | 'unlinked'
+  site_id?: string
+}): Promise<{ total: number; stats: { active: number; linked: number; unlinked: number }; items: BioLinkageItem[] }> {
+  const params = new URLSearchParams()
+  if (opts?.q) params.set('q', opts.q)
+  if (opts?.link_filter) params.set('link_filter', opts.link_filter)
+  if (opts?.site_id) params.set('site_id', opts.site_id)
+  const res = await apiFetch(`/person-linkage/active?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchBioPersonsUnlinked(opts?: {
+  q?: string
+  site_id?: string
+}): Promise<{ count: number; items: BioPersonUnlinked[] }> {
+  const params = new URLSearchParams()
+  if (opts?.q) params.set('q', opts.q)
+  if (opts?.site_id) params.set('site_id', opts.site_id)
+  const res = await apiFetch(`/person-linkage/persons/unlinked?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function linkBioPerson(employeeId: string, personExternalId: string, notes = '') {
+  const res = await apiFetch(`/person-linkage/${encodeURIComponent(employeeId)}/link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ person_external_id: personExternalId, notes }),
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function unlinkBioPerson(employeeId: string) {
+  const res = await apiFetch(`/person-linkage/${encodeURIComponent(employeeId)}/unlink`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export async function fetchPresenceReport(opts: {
+  date: string
+  core_site_id: string
+  biometric_site_id?: string
+}): Promise<PresenceReport> {
+  const params = new URLSearchParams({
+    date: opts.date,
+    core_site_id: opts.core_site_id,
+  })
+  if (opts.biometric_site_id) params.set('biometric_site_id', opts.biometric_site_id)
+  const res = await apiFetch(`/person-linkage/presence?${params}`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
 }
 
 export function todayISO(): string {

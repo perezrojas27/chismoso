@@ -1,25 +1,29 @@
-# Estado Actual y Tareas Pendientes (Agosto 2026)
+# Estado actual y pendientes — Biométricos (Agosto 2026)
 
-## Contexto de la Sesión
-- Se refactorizó el código original (monolito en `backend/app`) dividiéndolo en tres subpaquetes lógicos: `edge_app`, `cloud_app` y `shared`.
-- **Despliegue Edge Finalizado**: El Agente Edge fue instalado exitosamente en el servidor de Biométricos (Windows 10 - `192.168.10.31`).
-  - Se instaló Python 3.11 en el entorno de Windows.
-  - Se configuró la conexión local al terminal físico (IP: 192.168.10.200).
-  - Se utilizó WinSW para convertir la aplicación en el **Servicio de Windows** `Albatros Edge Service`, garantizando su ejecución en segundo plano (puerto 8003).
-- **Documentación de Integración**: Se redactó el documento `GUIA_INTEGRACION_INTEGRADO.md` con las especificaciones técnicas para que el equipo de desarrollo asimile el módulo biométrico en el ERP principal.
+Documento vivo del módulo. Canónico monorepo: [`docs/modulos/MODULO_BIOMETRICO.md`](../../../docs/modulos/MODULO_BIOMETRICO.md).
 
-## Pendientes para la Siguiente Etapa (Proyecto INTEGRADO)
+## Hecho
 
-1. **Asimilación en INTEGRADO:**
-   - Crear los roles sugeridos (`biometricos.view`, `biometricos.admin`, `biometricos.system`) en el módulo de Auth/Permisos.
-   - Apuntar el `cloud_app` a la base de datos PostgreSQL de INTEGRADO (`albatros-db`) y correr las migraciones (Alembic) para generar las tablas.
+- Refactor `edge_app` / `cloud_app` / `shared` + asimilación a INTEGRADO (`client_id=biometrico`).
+- Cloud + SPA en lab oficina (`:8090`); inventarios vía heartbeat.
+- **Consola de sede** en el agente (`:8003`): login TI, ISAPI, detectar/configurar dispositivos.
+- Separación: edge **no** se publica en el compose del portal (perfil `biometrico-edge-lab` opcional).
+- Windows `192.168.10.31`: `C:\AlbatrosEdge` + WinSW; SSH `jvalor` + llave oficina.
+- Compose independiente: `docker-compose.edge-sede.yml` (Linux/Pi).
+- Diagnóstico inestabilidad BIO2: `scripts/diag-biometricos-bio2.sh`.
 
-2. **Despliegue del Cloud App en Servidor de Pruebas:**
-   - En el servidor de pruebas (`192.168.105.17`), modificar el archivo `docker-compose.server.yml` de INTEGRADO para agregar el servicio `biometricos-cloud`.
-   - Exponer el puerto `8090` para recibir la ingesta de datos proveniente del Agente Edge instalado en Windows.
+## Pendiente
 
-3. **Pruebas de Ingesta Reales:**
-   - Verificar que los eventos marcados en el biométrico fluyan correctamente desde el `edge_app` hacia el `biometricos-cloud` y se registren en la base de datos de PostgreSQL.
+1. Asignar roles a grupos en Admin.
+2. UAT marcajes / comedor / PDF con agente sede estable.
+3. Firewall `:8003` entre VLANs **o** acceso solo por túnel SSH / host en misma LAN.
+4. PoC Raspberry Pi como agente (recomendado vs Windows HikCentral).
+5. Deploy prod — solo tras UAT.
 
-4. **Desarrollo Frontend:**
-   - Consumir la API desde el Frontend en React/Vue para mostrar los reportes de asistencia y generar las exportaciones de PDF/Excel.
+## Notas de inestabilidad BIO2
+
+El host `.31` ejecuta **HikCentral Access Control** completo en ~8 GB RAM; hay cortes de ruta y crash loops históricos del servicio edge. No usar ping ICMP como único criterio (bloqueado). Ver [`DIAGNOSTICO_INESTABILIDAD_BIO2_20260806.md`](../../../docs/informes/DIAGNOSTICO_INESTABILIDAD_BIO2_20260806.md).
+
+---
+
+*Integración documentada por Julio J. Valor P. — julio.valor@goalbatros.com · jpvalor1@gmail.com · [CREDITS.md](../../../CREDITS.md)*

@@ -9,10 +9,17 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 
+import os
+
 from shared.config import HikvisionDevice
 
-_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "hikvision_devices.json"
 _lock = threading.Lock()
+
+
+def _default_registry_path() -> Path:
+    raw = (os.environ.get("EDGE_DATA_DIR") or "").strip()
+    base = Path(raw) if raw else Path(__file__).resolve().parents[2] / "data"
+    return base / "hikvision_devices.json"
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,32}$")
 _HOST_RE = re.compile(
@@ -93,8 +100,8 @@ class ManagedDeviceCreate(BaseModel):
 
 
 class DeviceRegistry:
-    def __init__(self, path: Path = _DATA_PATH) -> None:
-        self.path = path
+    def __init__(self, path: Path | None = None) -> None:
+        self.path = path or _default_registry_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
             self._write([])

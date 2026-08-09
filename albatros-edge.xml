@@ -1,0 +1,14 @@
+<service>
+  <id>albatros-edge</id>
+  <name>Albatros Edge Service</name>
+  <description>Servicio local para sincronización ISAPI con biométricos Hikvision.</description>
+  
+  <workingdirectory>C:\AlbatrosEdge\backend</workingdirectory>
+  <executable>C:\AlbatrosEdge\.venv\Scripts\python.exe</executable>
+  <arguments>-m uvicorn edge_app.main:app --host 0.0.0.0 --port 8003</arguments>
+  
+  <env name="PYTHONPATH" value="C:\AlbatrosEdge\backend"/>
+  <logmode>rotate</logmode>
+  
+  <onfailure action="restart" delay="10 sec"/>
+</service>

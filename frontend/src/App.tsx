@@ -16,6 +16,7 @@ import { AttendanceTable } from './components/AttendanceTable'
 import { CafeteriaTable } from './components/CafeteriaTable'
 import { DevicesPanel } from './components/DevicesPanel'
 import { GthExceptionPanel } from './components/GthExceptionPanel'
+import { PersonLinkagePanel } from './components/PersonLinkagePanel'
 import { PdfPreviewModal } from './components/PdfPreviewModal'
 import {
   ATTENDANCE_PERIODS,
@@ -59,14 +60,12 @@ import {
   displayName,
   getDevRole,
   isAuthRequired,
-  logoutPortal,
   roleLabel,
   setDevRole,
   type AppRole,
 } from './portalAuth'
-import './styles/liquid-glass.css'
 
-type Tab = 'attendance' | 'cafeteria' | 'devices'
+type Tab = 'attendance' | 'cafeteria' | 'devices' | 'linkage'
 
 type PreviewState = {
   open: boolean
@@ -149,7 +148,9 @@ export default function App() {
 
   // Si el rol local cambia, corregir pestaña activa
   useEffect(() => {
-    if (tab === 'devices' && !canManageDevices()) {
+    if (tab === 'linkage' && !canOperateGth()) {
+      setTab(canAccessCafeteria() ? 'cafeteria' : 'attendance')
+    } else if (tab === 'devices' && !canManageDevices()) {
       setTab(canAccessCafeteria() ? 'cafeteria' : 'attendance')
     } else if (tab === 'attendance' && !canAccessAttendance()) {
       setTab('cafeteria')
@@ -399,7 +400,9 @@ export default function App() {
       ? 'Cierre diario de comedor'
       : tab === 'devices'
         ? 'Dispositivos biométricos'
-        : 'Asistencia — primera y última marca'
+        : tab === 'linkage'
+          ? 'Vínculo GTH ↔ biométrico'
+          : 'Asistencia — primera y última marca'
 
   function goTab(next: Tab) {
     setTab(next)
@@ -420,59 +423,66 @@ export default function App() {
   }
 
   return (
-    <div className="admin-frame">
-      <aside className="admin-sidebar">
-        <div className="admin-sidebar__brand">
-          <img className="admin-sidebar__logo" src="/logo-albatros.png" alt="Albatros" />
-          <span className="admin-sidebar__brand-text">Biométricos</span>
+    <>
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <img
+            src="/assets/brand/logo-integrado-mark.svg"
+            alt="Albatros INTEGRADO"
+            data-brand-logo="true"
+            data-integrado-mark="true"
+          />
         </div>
-        <nav className="admin-nav" aria-label="Secciones">
+        <nav aria-label="Secciones">
           {canAccessCafeteria() && (
             <button
               type="button"
-              className={`admin-nav__btn ${tab === 'cafeteria' ? 'is-active' : ''}`}
+              className={`nav-item ${tab === 'cafeteria' ? 'active' : ''}`}
               onClick={() => goTab('cafeteria')}
             >
-              <span className="admin-nav__icon" aria-hidden>
-                🍽️
-              </span>
               Comedor
             </button>
           )}
           {canAccessAttendance() && (
             <button
               type="button"
-              className={`admin-nav__btn ${tab === 'attendance' ? 'is-active' : ''}`}
+              className={`nav-item ${tab === 'attendance' ? 'active' : ''}`}
               onClick={() => goTab('attendance')}
             >
-              <span className="admin-nav__icon" aria-hidden>
-                ⏱️
-              </span>
               Asistencia
             </button>
           )}
           {canManageDevices() && (
             <button
               type="button"
-              className={`admin-nav__btn ${tab === 'devices' ? 'is-active' : ''}`}
+              className={`nav-item ${tab === 'devices' ? 'active' : ''}`}
               onClick={() => goTab('devices')}
             >
-              <span className="admin-nav__icon" aria-hidden>
-                📡
-              </span>
               Dispositivos
             </button>
           )}
+          {canOperateGth() && (
+            <button
+              type="button"
+              className={`nav-item ${tab === 'linkage' ? 'active' : ''}`}
+              onClick={() => goTab('linkage')}
+            >
+              Vínculo GTH
+            </button>
+          )}
         </nav>
-        <div className="admin-sidebar__foot">
+        <div className="sidebar-foot">
           {health?.auth_disabled ? 'Auth local desactivada' : `API · ${health?.client_id ?? 'biometrico'}`}
         </div>
       </aside>
 
-      <div className="admin-main">
-        <header className="admin-topbar">
-          <h1 className="admin-topbar__title">{pageTitle}</h1>
-          <div className="admin-topbar__actions">
+      <main className="main">
+        <header className="topbar">
+          <div className="topbar-title-wrap">
+            <h1>{pageTitle}</h1>
+            <div className="topbar-sub">Control de Biométricos</div>
+          </div>
+          <div className="topbar-tools">
             {sites.length > 0 && (
               <label className="dev-role">
                 <span className="visually-hidden">Sede</span>
@@ -489,7 +499,7 @@ export default function App() {
                 </select>
               </label>
             )}
-            <span className="admin-topbar__user">{displayName()}</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{displayName()}</span>
             {!isAuthRequired() && (
               <label className="dev-role">
                 <span className="visually-hidden">Rol local</span>
@@ -522,23 +532,17 @@ export default function App() {
                   : `${health.source}`
                 : 'API…'}
             </div>
-            {isAuthRequired() && (
-              <>
-                <button type="button" className="btn-hub" onClick={() => backToHub()}>
-                  Hub
-                </button>
-                <button type="button" className="btn-logout" onClick={() => logoutPortal()}>
-                  Salir
-                </button>
-              </>
-            )}
+            <button type="button" className="btn btn-hub" onClick={() => backToHub()}>
+              ← Hub
+            </button>
           </div>
         </header>
 
-        <div className="admin-content">
-          <div className="app-shell">
-            <div className="layout">
-        {tab === 'devices' ? (
+        <div className="content module-fluid">
+          <div className="layout">
+        {tab === 'linkage' ? (
+          <PersonLinkagePanel biometricSiteId={siteId || undefined} />
+        ) : tab === 'devices' ? (
           <DevicesPanel />
         ) : tab === 'cafeteria' ? (
           <section className="glass panel">
@@ -941,10 +945,9 @@ export default function App() {
             <AttendanceTable report={attendance} loading={loading} error={error} />
           </section>
         )}
-            </div>
           </div>
         </div>
-      </div>
+      </main>
 
       <PdfPreviewModal
         open={preview.open}
@@ -955,6 +958,6 @@ export default function App() {
         error={preview.error}
         onClose={closePreview}
       />
-    </div>
+    </>
   )
 }

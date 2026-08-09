@@ -1,24 +1,27 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="apple-touch-icon" href="/logo-albatros.png" />
-    <title>Control de Biométricos — Albatros</title>
+    <script src="/integrado-theme.js?v=20260806a"></script>
+    <link rel="icon" href="/assets/brand/favicon-integrado.png" type="image/png" />
+    <title>Control de Biométricos — Albatros INTEGRADO</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- En portal INTEGRADO: descomentar / servir desde nginx
-    <script src="/portal-integrado.js"></script>
-    -->
+    <link rel="stylesheet" href="/integrado-tokens.css" />
+    <link rel="stylesheet" href="/integrado-brand.css?v=20260806a" />
+    <script src="/global-theme.js?v=20260806a"></script>
+    <link rel="stylesheet" href="/integrado-components.css" />
+    <link rel="stylesheet" href="/integrado-admin-shell.css" />
+    <link rel="stylesheet" href="/integrado-theme.css?v=20260806a" />
+    <script src="/portal-integrado.js?v=20260806a"></script>
   </head>
-  <body class="albatros-admin">
+  <body class="albatros-admin" data-integrado-module="biometrico" data-integrado-module-label="Control de Biométricos">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

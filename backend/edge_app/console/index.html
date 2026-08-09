@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Consola agente biométrico — sede</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/console/console.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="view-login" class="login-wrap hidden">
+      <div class="login-card">
+        <p class="eyebrow">Agente de sede · Albatros</p>
+        <h1>Consola de biométricos</h1>
+        <p class="lead">
+          Herramienta local (como el software Hikvision): detecta y configura
+          relojes en la red de esta oficina. No sustituye al portal INTEGRADO.
+        </p>
+        <form id="form-login">
+          <label>Usuario
+            <input id="login-user" name="username" autocomplete="username" required />
+          </label>
+          <label>Contraseña
+            <input id="login-pass" name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="btn primary">Entrar</button>
+          <p id="login-error" class="error" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-main" class="main-wrap hidden">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Consola local del agente</p>
+          <h1 id="site-title">Biométricos — sede</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="session-user" class="chip"></span>
+          <button type="button" id="btn-logout" class="btn ghost">Salir</button>
+        </div>
+      </header>
+
+      <div class="grid">
+        <aside class="panel">
+          <h2>Credenciales del reloj</h2>
+          <p class="muted">
+            Usuario y clave ISAPI del terminal Hikvision. Se guardan solo en este servidor.
+          </p>
+          <form id="form-isapi">
+            <label>Usuario ISAPI
+              <input id="isapi-user" value="admin" required />
+            </label>
+            <label>Contraseña ISAPI
+              <input id="isapi-pass" type="password" required placeholder="••••••••" />
+            </label>
+            <button type="submit" class="btn primary">Guardar clave del reloj</button>
+          </form>
+          <p id="isapi-status" class="muted"></p>
+        </aside>
+
+        <section class="panel grow">
+          <div class="panel-head">
+            <div>
+              <h2>Dispositivos</h2>
+              <p id="devices-message" class="muted"></p>
+            </div>
+            <div class="row">
+              <button type="button" id="btn-refresh" class="btn">Actualizar</button>
+              <button type="button" id="btn-add" class="btn primary">Agregar manual</button>
+            </div>
+          </div>
+
+          <div class="scan-bar">
+            <label>Buscar en la red (IP cercana)
+              <input id="scan-seed" placeholder="192.168.10.200" />
+            </label>
+            <button type="button" id="btn-scan" class="btn accent">Detectar dispositivos</button>
+          </div>
+
+          <form id="form-add" class="add-form hidden">
+            <label>IP / host <input id="add-host" required placeholder="192.168.10.201" /></label>
+            <label>Puerto <input id="add-port" type="number" value="80" min="1" max="65535" required /></label>
+            <label>Ubicación <input id="add-location" required placeholder="Ej. Ascensores Torre" /></label>
+            <div class="row">
+              <button type="submit" class="btn primary">Guardar dispositivo</button>
+              <button type="button" id="btn-add-cancel" class="btn ghost">Cancelar</button>
+            </div>
+          </form>
+
+          <p id="notice" class="notice" hidden></p>
+          <p id="error" class="error" hidden></p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Estado</th>
+                  <th>Ubicación / ID</th>
+                  <th>IP</th>
+                  <th>Puerto</th>
+                  <th>Origen</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="devices-body">
+                <tr><td colspan="6" class="muted">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <footer class="footer">
+        <span>Portal reportes: use INTEGRADO (Hub → Control de Biométricos).</span>
+        <span id="footer-meta"></span>
+      </footer>
+    </section>
+  </div>
+  <script src="/console/console.js"></script>
+</body>
+</html>

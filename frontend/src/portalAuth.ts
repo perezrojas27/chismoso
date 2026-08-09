@@ -39,9 +39,9 @@ declare global {
   }
 }
 
-/** true solo cuando el módulo corre detrás del portal con JWT real */
+/** true en portal (build INTEGRADO). Solo false explícito en lab local. */
 export function isAuthRequired(): boolean {
-  return import.meta.env.VITE_AUTH_REQUIRED === 'true'
+  return import.meta.env.VITE_AUTH_REQUIRED !== 'false'
 }
 
 export function getToken(): string | null {
@@ -197,6 +197,16 @@ export function authHeaders(extra?: HeadersInit): HeadersInit {
     headers.Authorization = `Bearer ${token}`
   }
   return headers
+}
+
+/** Fetch API del módulo con cookie de sesión del portal. */
+export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(authHeaders(init.headers as HeadersInit))
+  return fetch(url, {
+    ...init,
+    credentials: 'include',
+    headers,
+  })
 }
 
 /**

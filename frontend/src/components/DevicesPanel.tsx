@@ -90,6 +90,7 @@ export function DevicesPanel() {
     }
   }
 
+  const readOnly = Boolean(data?.read_only)
   const statusLabel =
     data?.status === 'ok'
       ? 'Todos en línea'
@@ -110,31 +111,40 @@ export function DevicesPanel() {
           <p className="devices-panel__eyebrow">Administración TI</p>
           <h2 className="devices-panel__title">Dispositivos biométricos</h2>
           <p className="devices-panel__lead">
-            Monitoreo ISAPI y alta de terminales por ubicación. Los del .env conviven con los
-            agregados aquí.
+            {readOnly
+              ? 'Inventario reportado por agentes edge (heartbeat). El alta/baja ISAPI se gestiona en la sede.'
+              : 'Monitoreo ISAPI y alta de terminales por ubicación. Los del .env conviven con los agregados aquí.'}
           </p>
         </div>
         <div className="devices-panel__actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setShowForm((v) => !v)}
-            disabled={saving}
-          >
-            {showForm ? 'Cancelar' : 'Agregar dispositivo'}
-          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setShowForm((v) => !v)}
+              disabled={saving}
+            >
+              {showForm ? 'Cancelar' : 'Agregar dispositivo'}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn--primary"
             onClick={() => void load()}
             disabled={loading || saving}
           >
-            {loading ? 'Buscando…' : 'Probar conexiones'}
+            {loading ? 'Actualizando…' : readOnly ? 'Actualizar inventario' : 'Probar conexiones'}
           </button>
         </div>
       </header>
 
-      {showForm && (
+      {readOnly && data?.message && (
+        <div className="banner-info" role="status">
+          {data.message}
+        </div>
+      )}
+
+      {!readOnly && showForm && (
         <form className="devices-form" onSubmit={(e) => void onSubmit(e)}>
           <div className="devices-form__grid devices-form__grid--no-id">
             <div className="field devices-form__location">
@@ -207,7 +217,11 @@ export function DevicesPanel() {
           <div className="device-cards">
             {data.devices.length === 0 ? (
               <div className="device-card device-card--empty">
-                <p>No hay dispositivos. Agregue un terminal por su ubicación.</p>
+                <p>
+                  {readOnly
+                    ? 'Sin dispositivos reportados por el agente edge. Verifique enroll/heartbeat.'
+                    : 'No hay dispositivos. Agregue un terminal por su ubicación.'}
+                </p>
               </div>
             ) : (
               data.devices.map((d) => (
@@ -228,7 +242,9 @@ export function DevicesPanel() {
                         ? 'UI'
                         : d.origin === 'discovered'
                           ? 'Detectado'
-                          : '.env'}
+                          : d.origin === 'agent'
+                            ? 'Agente'
+                            : '.env'}
                     </span>
                   </div>
                   <h3 className="device-card__place">
@@ -253,11 +269,14 @@ export function DevicesPanel() {
                     <p className="device-search__ok">Conexión establecida</p>
                   ) : (
                     <p className="device-search__fail">
-                      {d.status_message || 'Conexión fallida'}
-                      {d.origin === 'discovered' ? ' · no configurado' : ''}
+                      {d.status_message ||
+                        (readOnly
+                          ? 'Inventario edge (ISAPI pendiente de verificar)'
+                          : 'Conexión fallida')}
+                      {!readOnly && d.origin === 'discovered' ? ' · no configurado' : ''}
                     </p>
                   )}
-                  {d.origin === 'discovered' && (
+                  {!readOnly && d.origin === 'discovered' && (
                     <button
                       type="button"
                       className="btn btn--primary device-card__remove"
@@ -277,7 +296,7 @@ export function DevicesPanel() {
                       Configurar
                     </button>
                   )}
-                  {d.removable && (
+                  {!readOnly && d.removable && (
                     <button
                       type="button"
                       className="btn btn--ghost device-card__remove"

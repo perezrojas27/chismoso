@@ -1,0 +1,19 @@
+# SPA Control de Biométricos bajo /biometrico/
+FROM node:20-alpine AS build-stage
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+ENV VITE_PUBLIC_PATH=/biometrico/
+ENV VITE_AUTH_REQUIRED=true
+RUN npm run build
+RUN mkdir -p /out/biometrico \
+  && cp dist/index.html /out/biometrico/ \
+  && cp -r dist/assets /out/biometrico/ \
+  && if [ -f dist/favicon.svg ]; then cp dist/favicon.svg /out/biometrico/; fi
+
+FROM nginx:stable-alpine AS production-stage
+COPY --from=build-stage /out/biometrico /usr/share/nginx/html/biometrico
+COPY nginx.integrado.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

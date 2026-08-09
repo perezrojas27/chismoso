@@ -1,0 +1,50 @@
+# Agente biométrico de SEDE (PC Windows, Linux o Raspberry Pi).
+# Corre en la LAN de los relojes Hikvision — NO en el servidor del portal INTEGRADO.
+#
+# Uso:
+#   cp .env.edge-sede.example .env
+#   # editar INTEGRADO_BASE_URL, ENROLLMENT_TOKEN, EDGE_ADMIN_PASSWORD, ISAPI...
+#   docker compose -f docker-compose.edge-sede.yml --env-file .env up -d --build
+#
+# Consola: http://IP-DE-ESTA-MAQUINA:8003/
+# (recomendado: EDGE_ADMIN_PASSWORD + firewall solo LAN TI)
+
+services:
+  biometrico-edge:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.edge
+    container_name: albatros_biometrico_edge_sede
+    environment:
+      - SOURCE=${SOURCE:-hikvision}
+      - SITE_CODE=${SITE_CODE:-oficina_central}
+      - SITE_NAME=${SITE_NAME:-Torre Sindoni (oficina central)}
+      - INTEGRADO_BASE_URL=${INTEGRADO_BASE_URL:?definir URL del portal}
+      - ENROLLMENT_TOKEN=${ENROLLMENT_TOKEN:?definir token de enrollment}
+      - AGENT_CREDENTIAL=${AGENT_CREDENTIAL:-}
+      - AUTH_DISABLED=true
+      - HIKVISION_DEVICES=${HIKVISION_DEVICES:-}
+      - HIKVISION_HOST=${HIKVISION_HOST:-192.168.10.200}
+      - HIKVISION_PORT=${HIKVISION_PORT:-80}
+      - HIKVISION_USER=${HIKVISION_USER:-admin}
+      - HIKVISION_PASSWORD=${HIKVISION_PASSWORD:-}
+      - HIKVISION_USE_HTTPS=${HIKVISION_USE_HTTPS:-false}
+      - DEVICE_ID=${DEVICE_ID:-PRINCIPAL}
+      - REPORT_DATA_MODE=store
+      - AUTO_SYNC_ON_REPORT=false
+      - EDGE_HEARTBEAT_SECONDS=${EDGE_HEARTBEAT_SECONDS:-60}
+      - EDGE_SYNC_EVERY_N=${EDGE_SYNC_EVERY_N:-5}
+      - EDGE_DATA_DIR=/data
+      - EDGE_ADMIN_USER=${EDGE_ADMIN_USER:-admin}
+      - EDGE_ADMIN_PASSWORD=${EDGE_ADMIN_PASSWORD:-}
+      - EDGE_SCAN_SEED_HOST=${EDGE_SCAN_SEED_HOST:-${HIKVISION_HOST:-192.168.10.200}}
+    ports:
+      - "${BIOMETRICO_EDGE_PORT:-8003}:8003"
+    volumes:
+      - biometrico_edge_sede_data:/data
+    restart: unless-stopped
+    # En hosts con varias NICs, opcional: network_mode: host (Linux) para descubrir LAN
+
+volumes:
+  biometrico_edge_sede_data:
+    name: albatros_biometrico_edge_sede_data

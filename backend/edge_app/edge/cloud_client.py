@@ -41,6 +41,8 @@ class CloudAgentClient:
             "enrollment_token": enrollment_token,
             "agent_version": AGENT_VERSION,
             "hostname": hostname,
+            "site_code": self.settings.site_code,
+            "site_id": (self.settings.site_id or "").strip(),
         }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, json=payload, headers=self._headers())

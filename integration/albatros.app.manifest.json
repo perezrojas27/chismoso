@@ -2,7 +2,14 @@
   "schema_version": 1,
   "client_id": "biometrico",
   "display_name": "Control de Biométricos",
-  "description": "Cierre de comedor y control de asistencia (primera/última marca) desde dispositivos Hikvision, con permisos GTH para llegadas fuera de corte.",
+  "description": "Cierre de comedor y control de asistencia (primera/última marca) desde dispositivos Hikvision vía agentes edge ISAPI, con permisos GTH para llegadas fuera de corte.",
+  "provenance": {
+    "integrator": {
+      "name": "Julio J. Valor P.",
+      "email_corporate": "julio.valor@goalbatros.com",
+      "email_personal": "jpvalor1@gmail.com"
+    }
+  },
   "roles": [
     {
       "name": "servicios_generales",
@@ -37,19 +44,23 @@
     ]
   },
   "integration_notes": {
-    "jwt_claims_used": ["sub", "id", "unit_id", "department_id", "is_superadmin", "app_roles"],
+    "jwt_claims_used": ["sub", "id", "unit_id", "department_id", "is_superadmin", "app_roles", "jti"],
     "local_storage_token_key": "albatros_token",
     "local_storage_user_key": "albatros_user",
-    "portal_scripts": ["portal-integrado.js"],
-    "theme_css": ["tokens-diseno-albatros.css"],
-    "architecture": "edge-per-site ISAPI + cloud reports; ver docs/ARQUITECTURA_EDGE_CLOUD.md",
+    "portal_scripts": [
+      "integrado-theme.js",
+      "global-theme.js",
+      "portal-integrado.js"
+    ],
+    "theme_css": [
+      "integrado-tokens.css",
+      "integrado-brand.css",
+      "integrado-components.css",
+      "integrado-admin-shell.css",
+      "integrado-theme.css"
+    ],
+    "architecture": "edge-per-site ISAPI + cloud Postgres reports; ver docs/ARQUITECTURA_EDGE_CLOUD.md",
     "agent_api_contract": "/api/asistencia/v1 (enroll, ingest, heartbeat)",
-    "seed_roles_snippet": {
-      "biometrico": {
-        "name": "Control de Biométricos",
-        "roles": ["servicios_generales", "gth", "admin"]
-      }
-    },
     "identity": "GTH es maestro de personas. La cédula/código empleado (employee_code) cruzará el person_external_id del terminal; no duplicar padrón completo en este módulo."
   }
 }

@@ -96,11 +96,23 @@ async def _load_clean_events(
     site_id: str | None = None,
 ):
     """
-    Reportes leen del store (guía edge/cloud).
-    Si AUTO_SYNC_ON_REPORT=true, primero sincroniza ISAPI→SQLite.
-    Modo live: conserva el comportamiento anterior (ISAPI en el request).
+    Reportes: Postgres (cloud) si DATABASE_URL; si no, store SQLite / live ISAPI.
     """
     mode = (settings.report_data_mode or "store").strip().lower()
+
+    if (settings.database_url or "").strip():
+        from datetime import datetime, time
+
+        from shared.database import SessionLocal
+        from shared.pg_events import list_events
+
+        from_dt = datetime.combine(from_date, time.min)
+        to_dt = datetime.combine(to_date, time(23, 59, 59))
+        db = SessionLocal()
+        try:
+            return list_events(db, from_dt, to_dt, site_id=site_id)
+        finally:
+            db.close()
 
     if mode == "live":
         source = create_event_source(settings)

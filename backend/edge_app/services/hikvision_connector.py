@@ -393,7 +393,10 @@ class HikvisionConnector(AccessEventSource):
         Prueba real: Digest + deviceInfo + búsqueda AcsEvent del día.
         Devuelve muestras visibles para demostrar conexión establecida.
         """
-        auth = httpx.DigestAuth(self.settings.hikvision_user, self.settings.hikvision_password)
+        auth = httpx.DigestAuth(
+            self.settings.effective_hikvision_user(),
+            self.settings.effective_hikvision_password(),
+        )
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url,
@@ -549,7 +552,10 @@ class HikvisionConnector(AccessEventSource):
         total_matches: int | None = None
         page_size = min(max(1, self.page_size), self.MAX_PAGE_SIZE)
 
-        auth = httpx.DigestAuth(self.settings.hikvision_user, self.settings.hikvision_password)
+        auth = httpx.DigestAuth(
+            self.settings.effective_hikvision_user(),
+            self.settings.effective_hikvision_password(),
+        )
 
         try:
             async with httpx.AsyncClient(

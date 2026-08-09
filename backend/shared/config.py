@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     agent_credential: str = ""
     integrado_timeout: float = 20.0
 
+    # Cloud Postgres + CORS + lab mock
+    database_url: str = ""
+    cors_origins: str = ""
+    allow_lab_mock: bool = False
+
     # JSON generado desde PDF HikCentral (Tarjeta de registro de tiempo)
     mock_events_json: str = ""
 
@@ -61,9 +66,38 @@ class Settings(BaseSettings):
     letterhead_pdf: str = str(REPO_ROOT / "assets" / "hoja-membretada.pdf")
 
     # Integración Albatros INTEGRADO
-    auth_disabled: bool = True  # true = desarrollo local sin JWT
+    auth_disabled: bool = False  # true solo en desarrollo local sin JWT
     jwt_secret_key: str = ""
     app_client_id: str = "biometrico"
+
+    # Consola local del agente (UI tipo software Hikvision en :8003)
+    edge_admin_user: str = "admin"
+    edge_admin_password: str = ""
+    edge_data_dir: str = ""
+    # Semilla de escaneo LAN si aún no hay dispositivos (ej. 192.168.10.200)
+    edge_scan_seed_host: str = ""
+
+    def effective_hikvision_user(self) -> str:
+        try:
+            from edge_app.services.isapi_secrets import load_isapi_credentials
+
+            stored = load_isapi_credentials()
+            if stored and stored.get("username"):
+                return stored["username"]
+        except Exception:
+            pass
+        return (self.hikvision_user or "admin").strip() or "admin"
+
+    def effective_hikvision_password(self) -> str:
+        try:
+            from edge_app.services.isapi_secrets import load_isapi_credentials
+
+            stored = load_isapi_credentials()
+            if stored and stored.get("password"):
+                return stored["password"]
+        except Exception:
+            pass
+        return self.hikvision_password or ""
 
     @property
     def cafeteria_cutoff_time(self):
