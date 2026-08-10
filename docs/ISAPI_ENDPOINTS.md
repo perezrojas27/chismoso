@@ -8,7 +8,12 @@ No se usa OpenAPI / Artemis de HikCentral.
 | Info dispositivo | GET | `/ISAPI/System/deviceInfo` | Probe / health |
 | Eventos de acceso | POST | `/ISAPI/AccessControl/AcsEvent?format=json` | Preferido; paginación `searchResultPosition` + `maxResults` (firmware ≤ 10) |
 | Eventos (XML legacy) | POST | `/ISAPI/AccessControl/AcsEvent/Search` | Fallback |
-| Usuarios | POST | `/ISAPI/AccessControl/UserInfo/Search?format=json` | Enriquece nombre por `employeeNo` (lotes ≤ 10) |
+| Usuarios | POST | `/ISAPI/AccessControl/UserInfo/Search?format=json` | Enriquece nombre por `employeeNo` (lotes ≤ 10). Depto/`orgName` suele venir vacío en DS-K1T8003MF |
+
+## Qué no se sincroniza hoy
+
+- **Grupos geográficos** / organización de Personas (HikCentral u otro listado): no hay ingest a `biometrico.*`.  
+- Ver [`VINCULO_GTH_BIOMETRICO.md`](../../../docs/guias/VINCULO_GTH_BIOMETRICO.md) §datos visibles.
 
 ## Descubrimiento de dispositivos
 

@@ -52,6 +52,8 @@ Los roles y el manifiesto deben reflejarse también en el monorepo (`seed_roles`
 | UI | `npm run dev :5173` | `/biometrico/` detrás de nginx |
 | Consola dispositivos | Edge `:8003` | Misma idea en la sede, no en el Hub |
 
+**Nota (2026-08-10):** los **grupos geográficos** del listado de Personas en HikCentral/biométrico **no** se sincronizan hoy a INTEGRADO. No reemplazan el vínculo GTH (`person_links`). Ver `docs/guias/VINCULO_GTH_BIOMETRICO.md` en el monorepo.
+
 ## Referencia embebido
 
 - `README_INTEGRADO.md` — notas de empaquetado (Dockerfiles, nginx del módulo)
