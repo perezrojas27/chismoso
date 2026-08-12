@@ -96,6 +96,18 @@ npm run dev -- --host 0.0.0.0 --port 5173
 
 ---
 
+## Cliente local de sede (instaladores)
+
+El agente + consola (`:8003`) **ya está en este repo** (`backend/edge_app/`).
+
+| Plataforma | Cómo instalar | Guía |
+|------------|---------------|------|
+| Windows | `packaging/windows/install-edge.ps1` | [`docs/INSTALACION_CLIENTE_EDGE.md`](docs/INSTALACION_CLIENTE_EDGE.md) |
+| Debian 12+ | `packaging/debian/install-edge-debian.sh` | idem |
+| Docker | `docker-compose.edge-sede.yml` | idem |
+
+Tamaño orientativo: código **~1–2 MB**; instalado con venv **~90–150 MB**. Detalle: [`packaging/README.md`](packaging/README.md).
+
 ## Modos de datos
 
 | Variable | Efecto |

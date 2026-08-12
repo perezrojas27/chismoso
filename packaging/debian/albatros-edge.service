@@ -1,0 +1,18 @@
+[Unit]
+Description=Albatros Edge — agente biométrico de sede (consola :8003)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=albatros-edge
+Group=albatros-edge
+WorkingDirectory=/opt/albatros-edge/backend
+Environment=PYTHONPATH=/opt/albatros-edge/backend
+ExecStart=/opt/albatros-edge/.venv/bin/python -m uvicorn edge_app.main:app --host 0.0.0.0 --port 8003
+Restart=on-failure
+RestartSec=10
+# Solo LAN de sede en firewall; no exponer a Internet
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,8 @@
 
 **Una instalación = una sede** (Maiquetía, Maracay, etc.). No intente alcanzar IPs de otra ciudad desde un solo PC.
 
+> **Instaladores Windows / Debian:** ver [`INSTALACION_CLIENTE_EDGE.md`](INSTALACION_CLIENTE_EDGE.md) y carpeta [`packaging/`](../packaging/README.md).
+
 ## ¿Debe correr en el mismo PC que el software Hikvision?
 
 **No.** El agente Albatros **no depende** de iVMS / Hik-Connect / “software de servidor” Hikvision.

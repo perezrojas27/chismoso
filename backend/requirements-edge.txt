@@ -1,0 +1,10 @@
+# Solo dependencias del agente edge + consola (:8003).
+# Más liviano que requirements.txt (sin ReportLab/Postgres del cloud).
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+httpx==0.28.1
+pydantic==2.11.3
+pydantic-settings==2.8.1
+python-dotenv==1.1.0
+python-multipart==0.0.20
+python-jose[cryptography]==3.4.0
