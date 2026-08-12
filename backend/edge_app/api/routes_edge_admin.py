@@ -29,7 +29,7 @@ def _admin_user(settings: Settings) -> str:
     try:
         from edge_app.services.console_auth_secrets import load_console_auth
 
-        stored = load_console_auth()
+        stored = load_console_auth(settings.edge_data_dir or None)
         if stored and stored.get("username"):
             return stored["username"]
     except Exception:
@@ -41,7 +41,7 @@ def _admin_password(settings: Settings) -> str:
     try:
         from edge_app.services.console_auth_secrets import load_console_auth
 
-        stored = load_console_auth()
+        stored = load_console_auth(settings.edge_data_dir or None)
         if stored and stored.get("password"):
             return stored["password"]
     except Exception:
@@ -56,10 +56,9 @@ def _revoke_all_sessions() -> None:
 def _password_ok(provided: str, expected: str) -> bool:
     if not expected:
         return False
-    return hmac.compare_digest(
-        hashlib.sha256(provided.encode("utf-8")).digest(),
-        hashlib.sha256(expected.encode("utf-8")).digest(),
-    )
+    a = hashlib.sha256(provided.encode("utf-8")).digest()
+    b = hashlib.sha256(expected.encode("utf-8")).digest()
+    return hmac.compare_digest(a, b)
 
 
 def _purge_expired() -> None:
@@ -131,14 +130,18 @@ async def require_edge_console_auth(
 
 @router.get("/status")
 def console_status(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
+    from edge_app.services.console_auth_secrets import load_console_auth
+
     pwd = _admin_password(settings)
     isapi_pwd = (settings.effective_hikvision_password() or "").strip()
+    stored = load_console_auth(settings.edge_data_dir or None)
     return {
         "console": "biometrico-edge",
         "site_code": settings.site_code,
         "site_name": settings.site_name,
         "auth_required": bool(pwd),
-        "default_username": _admin_user(settings) if pwd else _admin_user(settings),
+        "default_username": _admin_user(settings),
+        "console_auth_from_file": bool(stored),
         "isapi_user": settings.effective_hikvision_user(),
         "isapi_password_configured": bool(isapi_pwd),
         "source": settings.source,
@@ -227,17 +230,26 @@ def change_console_password(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
     """
-    Cambia usuario/clave de la consola local (persistido en data/console_auth.json).
+    Cambia usuario/clave de la consola local (persistido en data/console_auth.json
+    y sincronizado a EDGE_ADMIN_* del .env).
     Si aún no hay clave (lab abierto), current_password puede ir vacío.
     """
-    from edge_app.services.console_auth_secrets import save_console_auth
+    from pathlib import Path
+
+    from edge_app.services.console_auth_secrets import (
+        save_console_auth,
+        sync_env_console_credentials,
+    )
 
     expected = _admin_password(settings)
     if expected:
         if not _password_ok(body.current_password or "", expected):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="La contraseña actual de la consola no es correcta.",
+                detail=(
+                    "La contraseña actual de la consola no es correcta. "
+                    "Use la clave con la que inició sesión (o EDGE_ADMIN_PASSWORD del .env)."
+                ),
             )
     elif (body.current_password or "").strip():
         raise HTTPException(
@@ -253,14 +265,39 @@ def change_console_password(
         )
 
     new_user = (body.new_username or "").strip() or _admin_user(settings)
-    save_console_auth(new_user, new_pwd)
+    data_dir = (settings.edge_data_dir or "").strip() or None
+    try:
+        saved_path = save_console_auth(new_user, new_pwd, data_dir)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se pudo guardar la clave de consola: {exc}",
+        ) from exc
+
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    env_synced = sync_env_console_credentials(
+        new_user, new_pwd, env_path=env_path
+    )
+
+    # Invalidar caché de Settings para que el próximo login lea la clave nueva del .env
+    try:
+        get_settings.cache_clear()
+    except Exception:
+        pass
+
     _revoke_all_sessions()
     token = issue_session(new_user)
     return {
-        "message": "Contraseña de la consola actualizada. Sesión renovada.",
+        "message": (
+            "Contraseña de la consola actualizada. Sesión renovada."
+            + (" (.env sincronizado)" if env_synced else "")
+        ),
         "username": new_user,
         "auth_required": True,
         "token": token,
         "expires_in_seconds": _SESSION_TTL_SEC,
         "previous_open_mode": bool(session.get("open")),
+        "saved": True,
+        "auth_file": saved_path.name,
+        "env_synced": env_synced,
     }

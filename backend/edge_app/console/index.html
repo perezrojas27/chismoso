@@ -24,7 +24,10 @@
             <input id="login-user" name="username" autocomplete="username" required />
           </label>
           <label>Contraseña
-            <input id="login-pass" name="password" type="password" autocomplete="current-password" required />
+            <span class="pw-field">
+              <input id="login-pass" name="password" type="password" autocomplete="current-password" required />
+              <button type="button" class="btn-eye" data-target="login-pass" aria-label="Mostrar contraseña">Ver</button>
+            </span>
           </label>
           <button type="submit" class="btn primary">Entrar</button>
           <p id="login-error" class="error" hidden></p>
@@ -54,37 +57,52 @@
             </p>
             <form id="form-isapi">
               <label>Usuario ISAPI
-                <input id="isapi-user" value="admin" required />
+                <input id="isapi-user" value="admin" required autocomplete="off" />
               </label>
               <label>Contraseña ISAPI
-                <input id="isapi-pass" type="password" required placeholder="••••••••" autocomplete="new-password" />
+                <span class="pw-field">
+                  <input id="isapi-pass" type="password" required placeholder="••••••••" autocomplete="new-password" />
+                  <button type="button" class="btn-eye" data-target="isapi-pass" aria-label="Mostrar contraseña">Ver</button>
+                </span>
               </label>
               <button type="submit" class="btn primary">Guardar clave del reloj</button>
             </form>
             <p id="isapi-status" class="muted"></p>
+            <p id="isapi-feedback" class="feedback" hidden></p>
           </div>
 
           <div class="panel">
             <h2>Acceso a esta consola</h2>
             <p class="muted">
               Usuario y contraseña para entrar a <em>esta aplicación</em> en el agente de sede.
+              Debe indicar la <strong>contraseña actual</strong> (la del login) para poder cambiarla.
             </p>
-            <form id="form-console-auth">
+            <form id="form-console-auth" autocomplete="off">
               <label>Usuario de consola
                 <input id="console-user" autocomplete="username" />
               </label>
               <label id="label-console-current">Contraseña actual
-                <input id="console-current" type="password" autocomplete="current-password" />
+                <span class="pw-field">
+                  <input id="console-current" type="password" autocomplete="current-password" />
+                  <button type="button" class="btn-eye" data-target="console-current" aria-label="Mostrar contraseña">Ver</button>
+                </span>
               </label>
               <label>Nueva contraseña (mín. 8)
-                <input id="console-new" type="password" autocomplete="new-password" required minlength="8" />
+                <span class="pw-field">
+                  <input id="console-new" type="password" autocomplete="new-password" required minlength="8" />
+                  <button type="button" class="btn-eye" data-target="console-new" aria-label="Mostrar contraseña">Ver</button>
+                </span>
               </label>
               <label>Confirmar nueva
-                <input id="console-confirm" type="password" autocomplete="new-password" required minlength="8" />
+                <span class="pw-field">
+                  <input id="console-confirm" type="password" autocomplete="new-password" required minlength="8" />
+                  <button type="button" class="btn-eye" data-target="console-confirm" aria-label="Mostrar contraseña">Ver</button>
+                </span>
               </label>
               <button type="submit" class="btn primary">Guardar acceso</button>
             </form>
             <p id="console-auth-hint" class="muted"></p>
+            <p id="console-auth-feedback" class="feedback" hidden></p>
           </div>
         </aside>
 

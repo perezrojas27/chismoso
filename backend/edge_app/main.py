@@ -22,6 +22,15 @@ CONSOLE_DIR = Path(__file__).resolve().parent / "console"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    import os
+
+    from shared.config import get_settings
+
+    settings = get_settings()
+    if (settings.edge_data_dir or "").strip():
+        os.environ["EDGE_DATA_DIR"] = settings.edge_data_dir.strip()
+        Path(settings.edge_data_dir.strip()).mkdir(parents=True, exist_ok=True)
+
     stop = asyncio.Event()
     task = asyncio.create_task(runtime_loop(stop), name="biometrico-edge-loop")
     logger.info("Edge runtime loop started")

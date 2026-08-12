@@ -192,6 +192,33 @@ th { color: var(--muted); font-size: 12px; font-weight: 600; }
 
 .error { color: #f0a0aa; margin-top: 8px; }
 .notice { color: #7ddeb0; margin: 8px 0; }
+.feedback {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.feedback.ok { color: #7ddeb0; }
+.feedback.err { color: #f0a0aa; }
+.pw-field {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.pw-field input { flex: 1; min-width: 0; }
+.btn-eye {
+  flex: 0 0 auto;
+  border: 1px solid var(--stroke);
+  background: #1c2230;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-eye:hover { color: var(--text); filter: brightness(1.08); }
 .footer {
   margin-top: 18px;
   display: flex;

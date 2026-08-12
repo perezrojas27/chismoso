@@ -80,6 +80,37 @@
     show(el, true);
   }
 
+  function setFeedback(elId, msg, tone) {
+    const el = $(elId);
+    if (!el) return;
+    if (!msg) {
+      el.hidden = true;
+      el.textContent = "";
+      el.classList.remove("ok", "err");
+      return;
+    }
+    el.textContent = msg;
+    el.hidden = false;
+    el.classList.remove("ok", "err");
+    el.classList.add(tone === "ok" ? "ok" : "err");
+  }
+
+  function wirePasswordToggles(root) {
+    (root || document).querySelectorAll(".btn-eye").forEach((btn) => {
+      if (btn.dataset.wired) return;
+      btn.dataset.wired = "1";
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-target");
+        const input = $(id);
+        if (!input) return;
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        btn.textContent = show ? "Ocultar" : "Ver";
+        btn.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+      });
+    });
+  }
+
   function badgeFor(device) {
     if (!device.configured) return ["info", "Detectado"];
     if (device.online) return ["ok", "En línea"];
@@ -277,8 +308,11 @@
     if (authRequired) {
       currentLabel.classList.remove("hidden");
       currentInput.required = true;
+      const src = status.console_auth_from_file
+        ? "clave guardada en el agente"
+        : "clave del archivo .env";
       $("console-auth-hint").textContent =
-        "Debe indicar la contraseña actual para cambiarla.";
+        `Debe indicar la contraseña actual (${src}) para poder cambiarla.`;
     } else {
       currentLabel.classList.add("hidden");
       currentInput.required = false;
@@ -374,6 +408,7 @@
   $("form-isapi").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setError(null);
+    setFeedback("isapi-feedback", null);
     try {
       const result = await api("/api/edge-admin/isapi-credentials", {
         method: "POST",
@@ -384,9 +419,11 @@
         }),
       });
       $("isapi-pass").value = "";
+      setFeedback("isapi-feedback", result.message, "ok");
       setNotice(result.message);
       await loadDevices();
     } catch (e) {
+      setFeedback("isapi-feedback", e.message, "err");
       setError(e.message);
     }
   });
@@ -394,10 +431,23 @@
   $("form-console-auth").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     setError(null);
+    setFeedback("console-auth-feedback", null);
     const neu = $("console-new").value;
     const conf = $("console-confirm").value;
     if (neu !== conf) {
-      setError("La nueva contraseña y la confirmación no coinciden.");
+      setFeedback(
+        "console-auth-feedback",
+        "La nueva contraseña y la confirmación no coinciden.",
+        "err",
+      );
+      return;
+    }
+    if (neu.trim().length < 8) {
+      setFeedback(
+        "console-auth-feedback",
+        "La nueva contraseña debe tener al menos 8 caracteres.",
+        "err",
+      );
       return;
     }
     try {
@@ -414,11 +464,13 @@
       $("console-current").value = "";
       $("console-new").value = "";
       $("console-confirm").value = "";
+      setFeedback("console-auth-feedback", result.message, "ok");
       setNotice(result.message);
       const status = await loadStatus();
       $("session-user").textContent = "Sesión activa";
       applyConsoleAuthHints(status);
     } catch (e) {
+      setFeedback("console-auth-feedback", e.message, "err");
       setError(e.message);
     }
   });
@@ -499,4 +551,6 @@
     $("login-error").hidden = false;
     $("login-error").textContent = e.message;
   });
+
+  wirePasswordToggles(document);
 })();
