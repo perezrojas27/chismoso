@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CafeteriaReport } from '../api'
 import { formatDate } from '../api'
+import { downloadCSV } from '../csvExport'
 import { formatEmployeeName } from '../formatEmployeeName'
 import { usePageSize } from '../usePageSize'
 import { PaginationBar } from './PaginationBar'
@@ -20,10 +21,53 @@ type Props = {
 export function CafeteriaTable({ report, loading, error, hideGthDetails = false }: Props) {
   const pageSize = usePageSize(25, 10)
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     setPage(1)
-  }, [report?.date, report?.employees.length, pageSize])
+    setSearch('')
+  }, [report?.date])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, pageSize])
+
+  /** Filas filtradas por búsqueda local */
+  const filtered = useMemo(() => {
+    if (!report) return []
+    if (!search.trim()) return report.employees
+    const q = search.toLowerCase().trim()
+    return report.employees.filter(
+      (emp) =>
+        formatEmployeeName(emp.employee_name).toLowerCase().includes(q) ||
+        emp.employee_id.toLowerCase().includes(q) ||
+        (emp.department?.toLowerCase() ?? '').includes(q),
+    )
+  }, [report, search])
+
+  function handleCSV() {
+    if (!report) return
+    const cols = hideGthDetails
+      ? (['#', 'Empleado', 'ID', 'Departamento'] as string[])
+      : (['#', 'Empleado', 'ID', 'Departamento', 'Hora marca', 'Observación'] as string[])
+
+    downloadCSV(
+      `comedor_${report.date}.csv`,
+      cols,
+      filtered.map((emp, i) =>
+        hideGthDetails
+          ? [i + 1, formatEmployeeName(emp.employee_name), emp.employee_id, emp.department || '']
+          : [
+              i + 1,
+              formatEmployeeName(emp.employee_name),
+              emp.employee_id,
+              emp.department || '',
+              emp.marked_time || '',
+              emp.observation || '',
+            ],
+      ),
+    )
+  }
 
   if (loading) {
     return (
@@ -35,7 +79,11 @@ export function CafeteriaTable({ report, loading, error, hideGthDetails = false 
   }
 
   if (error) {
-    return <div className="error">{error}</div>
+    return (
+      <div className="error" role="alert">
+        {error}
+      </div>
+    )
   }
 
   if (!report) {
@@ -46,11 +94,12 @@ export function CafeteriaTable({ report, loading, error, hideGthDetails = false 
     return <div className="empty">Nadie marcó antes del corte {report.cutoff}.</div>
   }
 
-  const totalPages = Math.max(1, Math.ceil(report.employees.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * pageSize
-  const slice = report.employees.slice(start, start + pageSize)
-  const excCount = report.exceptions_count ?? report.employees.filter((e) => e.has_exception).length
+  const slice = filtered.slice(start, start + pageSize)
+  const excCount =
+    report.exceptions_count ?? report.employees.filter((e) => e.has_exception).length
 
   return (
     <>
@@ -86,6 +135,33 @@ export function CafeteriaTable({ report, loading, error, hideGthDetails = false 
         </p>
       )}
 
+      {/* Barra de búsqueda + CSV */}
+      <div className="table-toolbar">
+        <input
+          className="table-search"
+          type="search"
+          placeholder="Buscar nombre, cédula, departamento…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Filtrar listado de comedor"
+        />
+        <div className="table-toolbar__right">
+          {search.trim() !== '' && (
+            <span className="table-toolbar__count" aria-live="polite">
+              {filtered.length} de {report.employees.length}
+            </span>
+          )}
+          <button
+            type="button"
+            className="btn btn--ghost btn--page"
+            onClick={handleCSV}
+            title="Exportar listado visible a CSV"
+          >
+            CSV ↓
+          </button>
+        </div>
+      </div>
+
       <div className="table-wrap">
         <table className="data-table data-table--cafeteria">
           <thead>
@@ -110,11 +186,16 @@ export function CafeteriaTable({ report, loading, error, hideGthDetails = false 
                 </td>
                 <td>{formatEmployeeName(emp.employee_name)}</td>
                 <td className="col-hide-md">{emp.department || '—'}</td>
-                {!hideGthDetails && (
-                  <td className="obs-cell">{emp.observation || '—'}</td>
-                )}
+                {!hideGthDetails && <td className="obs-cell">{emp.observation || '—'}</td>}
               </tr>
             ))}
+            {slice.length === 0 && (
+              <tr>
+                <td colSpan={hideGthDetails ? 3 : 4} className="empty">
+                  Sin resultados para &ldquo;{search}&rdquo;
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -122,7 +203,7 @@ export function CafeteriaTable({ report, loading, error, hideGthDetails = false 
       <PaginationBar
         page={safePage}
         pageSize={pageSize}
-        total={report.employees.length}
+        total={filtered.length}
         onChange={setPage}
       />
     </>

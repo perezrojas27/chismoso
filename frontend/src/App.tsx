@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchAttendance,
   fetchAttendancePdfBlob,
@@ -16,19 +16,16 @@ import { AttendanceTable } from './components/AttendanceTable'
 import { CafeteriaTable } from './components/CafeteriaTable'
 import { DevicesPanel } from './components/DevicesPanel'
 import { GthExceptionPanel } from './components/GthExceptionPanel'
-import { PersonLinkagePanel } from './components/PersonLinkagePanel'
 import { PdfPreviewModal } from './components/PdfPreviewModal'
+import { PeriodSelector } from './components/PeriodSelector'
+import { PersonLinkagePanel } from './components/PersonLinkagePanel'
 import {
-  ATTENDANCE_PERIODS,
-  MONTH_NAMES,
-  QUARTER_LABELS,
-  SEMESTER_LABELS,
   anchorForFortnight,
   anchorForMonth,
   anchorForQuarter,
   anchorForSemester,
-  clampToToday,
   clampRangeToToday,
+  clampToToday,
   fortnightHalfFromISO,
   maxSelectableYear,
   monthIndexFromISO,
@@ -38,7 +35,6 @@ import {
   selectableMonthIndexes,
   selectableQuarterIndexes,
   selectableSemesterIndexes,
-  selectableYears,
   semesterIndexFromISO,
   todayISO,
   validateDateRange,
@@ -65,6 +61,25 @@ import {
   type AppRole,
 } from './portalAuth'
 
+// ── SessionStorage helpers ────────────────────────────────────────────────────
+function saveSess(key: string, value: unknown) {
+  try {
+    sessionStorage.setItem(`bio_${key}`, JSON.stringify(value))
+  } catch {
+    /* ignore */
+  }
+}
+function loadSess<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(`bio_${key}`)
+    if (raw !== null) return JSON.parse(raw) as T
+  } catch {
+    /* ignore */
+  }
+  return fallback
+}
+
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 type Tab = 'attendance' | 'cafeteria' | 'devices' | 'linkage'
 
 type PreviewState = {
@@ -85,68 +100,103 @@ const PREVIEW_CLOSED: PreviewState = {
   error: null,
 }
 
+// ── Countdown de corte de comedor ─────────────────────────────────────────────
+function computeCafeCountdown(
+  cutoff: string | undefined,
+): { label: string; urgent: boolean } | null {
+  if (!cutoff) return null
+  const parts = cutoff.split(':').map(Number)
+  const h = parts[0] ?? 0
+  const m = parts[1] ?? 0
+  const s = parts[2] ?? 0
+  const now = new Date()
+  const cutoffDate = new Date(now)
+  cutoffDate.setHours(h, m, s, 0)
+  const diff = cutoffDate.getTime() - now.getTime()
+  if (diff <= 0) return null
+  const totalSecs = Math.floor(diff / 1000)
+  const hours = Math.floor(totalSecs / 3600)
+  const mins = Math.floor((totalSecs % 3600) / 60)
+  const secs = totalSecs % 60
+  const label =
+    hours > 0
+      ? `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+      : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  return { label, urgent: diff < 10 * 60 * 1000 }
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function App() {
   const maxDate = todayISO()
   const [devRole, setDevRoleState] = useState<AppRole>(() => getDevRole())
-  const [tab, setTab] = useState<Tab>('cafeteria')
-  const [health, setHealth] = useState<HealthResponse | null>(null)
 
-  const [period, setPeriod] = useState<AttendancePeriod>('day')
-  const initialRange = rangeForPeriod('day', maxDate)
-  const [anchorDate, setAnchorDate] = useState(maxDate)
+  // Restaurar estado desde sessionStorage
+  const [tab, setTab] = useState<Tab>(() => loadSess<Tab>('tab', 'cafeteria'))
+  const [period, setPeriod] = useState<AttendancePeriod>(() =>
+    loadSess<AttendancePeriod>('period', 'day'),
+  )
+  const initialRange = rangeForPeriod(
+    loadSess<AttendancePeriod>('period', 'day'),
+    loadSess('anchorDate', maxDate),
+  )
+  const [anchorDate, setAnchorDate] = useState(() => loadSess('anchorDate', maxDate))
   const [fromDate, setFromDate] = useState(initialRange.from)
   const [toDate, setToDate] = useState(initialRange.to)
-  const [cafeDate, setCafeDate] = useState(maxDate)
+  const [cafeDate, setCafeDate] = useState(() => loadSess('cafeDate', maxDate))
 
+  const [health, setHealth] = useState<HealthResponse | null>(null)
   const [attendance, setAttendance] = useState<AttendanceReport | null>(null)
   const [cafeteria, setCafeteria] = useState<CafeteriaReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<PreviewState>(PREVIEW_CLOSED)
-  /** Se incrementa al entrar a una vista para forzar regeneración del listado. */
   const [listEntryKey, setListEntryKey] = useState(0)
   const [sites, setSites] = useState<SiteInfo[]>([])
-  const [siteId, setSiteId] = useState<string>('')
+  const [siteId, setSiteId] = useState<string>(() => loadSess('siteId', ''))
 
-  const years = useMemo(() => selectableYears(), [maxDate])
-  const monthIndexes = useMemo(
-    () => selectableMonthIndexes(yearFromISO(anchorDate)),
-    [anchorDate],
-  )
-  const fortnightHalves = useMemo(
-    () => selectableFortnightHalves(yearFromISO(anchorDate), monthIndexFromISO(anchorDate)),
-    [anchorDate],
-  )
-  const quarterIndexes = useMemo(
-    () => selectableQuarterIndexes(yearFromISO(anchorDate)),
-    [anchorDate],
-  )
-  const semesterIndexes = useMemo(
-    () => selectableSemesterIndexes(yearFromISO(anchorDate)),
-    [anchorDate],
-  )
+  // Tick de 1 s para el countdown del comedor
+  const [, setTick] = useState(0)
+
+  // Para detectar cambios de pestaña en la carga progresiva
+  const prevTabRef = useRef<Tab>(tab)
+
   const attendanceRangeError = useMemo(
     () => validateDateRange(fromDate, toDate, maxDate),
     [fromDate, toDate, maxDate],
   )
   const cafeteriaDateError = useMemo(() => {
-    if (cafeDate > maxDate) {
-      return validateDateRange(cafeDate, cafeDate, maxDate)
-    }
+    if (cafeDate > maxDate) return validateDateRange(cafeDate, cafeDate, maxDate)
     return null
   }, [cafeDate, maxDate])
 
-  function clampYear(year: number): number {
-    return Math.min(year, maxSelectableYear())
-  }
+  // Countdown solo si estamos viendo el comedor de hoy
+  const cafeCountdown = useMemo(() => {
+    if (tab !== 'cafeteria' || cafeDate !== maxDate) return null
+    return computeCafeCountdown(health?.cafeteria_cutoff)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, cafeDate, maxDate, health?.cafeteria_cutoff])
 
+  // Persistencia en sessionStorage
+  useEffect(() => { saveSess('tab', tab) }, [tab])
+  useEffect(() => { saveSess('period', period) }, [period])
+  useEffect(() => { saveSess('anchorDate', anchorDate) }, [anchorDate])
+  useEffect(() => { saveSess('cafeDate', cafeDate) }, [cafeDate])
+  useEffect(() => { saveSess('siteId', siteId) }, [siteId])
+
+  // Tick de 1 s
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Health
   useEffect(() => {
     fetchHealth()
       .then(setHealth)
       .catch(() => setHealth(null))
   }, [])
 
-  // Si el rol local cambia, corregir pestaña activa
+  // Corregir pestaña activa si el rol cambia
   useEffect(() => {
     if (tab === 'linkage' && !canOperateGth()) {
       setTab(canAccessCafeteria() ? 'cafeteria' : 'attendance')
@@ -159,6 +209,7 @@ export default function App() {
     }
   }, [devRole, tab])
 
+  // Sedes
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -168,16 +219,16 @@ export default function App() {
         setSites(data.sites)
         setSiteId((prev) => prev || data.current_site_id || data.sites[0]?.id || '')
       } catch {
-        /* sede opcional en local */
+        /* sede opcional */
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
-  // Al entrar a cada vista: regenerar siempre. Si falla o no aplica, no queda listado previo.
+  // Regeneración de datos con carga progresiva
   useEffect(() => {
+    const tabChanged = prevTabRef.current !== tab
+    prevTabRef.current = tab
     let cancelled = false
 
     async function regenerate() {
@@ -189,10 +240,13 @@ export default function App() {
         return
       }
 
+      // Si se cambió de pestaña: limpiar datos stale inmediatamente
+      if (tabChanged) {
+        setAttendance(null)
+        setCafeteria(null)
+      }
       setLoading(true)
       setError(null)
-      setAttendance(null)
-      setCafeteria(null)
 
       try {
         if (tab === 'cafeteria') {
@@ -229,10 +283,7 @@ export default function App() {
     }
 
     void regenerate()
-    return () => {
-      cancelled = true
-    }
-    // Al cambiar de vista, sede o al forzar regeneración
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, listEntryKey, siteId])
 
@@ -242,6 +293,8 @@ export default function App() {
     }
   }, [preview.blobUrl])
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   function clearListings() {
     setAttendance(null)
     setCafeteria(null)
@@ -249,11 +302,8 @@ export default function App() {
   }
 
   function applyPeriod(nextPeriod: AttendancePeriod, nextAnchor?: string) {
-    // Sin ancla explícita → periodo actual (hoy)
     let anchor = clampToToday(nextAnchor ?? todayISO())
-    if (yearFromISO(anchor) > maxSelectableYear()) {
-      anchor = todayISO()
-    }
+    if (yearFromISO(anchor) > maxSelectableYear()) anchor = todayISO()
 
     if (nextPeriod === 'month') {
       const year = yearFromISO(anchor)
@@ -269,14 +319,10 @@ export default function App() {
       const year = yearFromISO(anchor)
       let month = monthIndexFromISO(anchor)
       const months = selectableMonthIndexes(year)
-      if (!months.includes(month)) {
-        month = months[months.length - 1] ?? 0
-      }
+      if (!months.includes(month)) month = months[months.length - 1] ?? 0
       let half = fortnightHalfFromISO(anchor)
       const halves = selectableFortnightHalves(year, month)
-      if (!halves.includes(half)) {
-        half = halves[halves.length - 1] ?? '1Q'
-      }
+      if (!halves.includes(half)) half = halves[halves.length - 1] ?? '1Q'
       anchor = clampToToday(anchorForFortnight(year, month, half))
     }
 
@@ -284,9 +330,7 @@ export default function App() {
       const year = yearFromISO(anchor)
       let quarter = quarterIndexFromISO(anchor)
       const allowed = selectableQuarterIndexes(year)
-      if (!allowed.includes(quarter)) {
-        quarter = (allowed[allowed.length - 1] ?? 0) as QuarterIndex
-      }
+      if (!allowed.includes(quarter)) quarter = (allowed[allowed.length - 1] ?? 0) as QuarterIndex
       anchor = clampToToday(anchorForQuarter(year, quarter))
     }
 
@@ -294,9 +338,8 @@ export default function App() {
       const year = yearFromISO(anchor)
       let semester = semesterIndexFromISO(anchor)
       const allowed = selectableSemesterIndexes(year)
-      if (!allowed.includes(semester)) {
+      if (!allowed.includes(semester))
         semester = (allowed[allowed.length - 1] ?? 0) as SemesterIndex
-      }
       anchor = clampToToday(anchorForSemester(year, semester))
     }
 
@@ -309,15 +352,9 @@ export default function App() {
     clearListings()
   }
 
-  function selectPeriodMode(nextPeriod: AttendancePeriod) {
-    // Siempre al periodo vigente según el día en curso
-    applyPeriod(nextPeriod, todayISO())
-  }
-
   async function loadAttendance() {
     setLoading(true)
     setError(null)
-    setAttendance(null)
     try {
       const safe = clampRangeToToday(fromDate, toDate, maxDate)
       if (safe.from !== fromDate) setFromDate(safe.from)
@@ -337,7 +374,6 @@ export default function App() {
   async function loadCafeteria() {
     setLoading(true)
     setError(null)
-    setCafeteria(null)
     try {
       const safeDate = clampToToday(cafeDate)
       if (safeDate !== cafeDate) setCafeDate(safeDate)
@@ -353,31 +389,13 @@ export default function App() {
     }
   }
 
-  async function openPreview(
-    title: string,
-    filename: string,
-    loader: () => Promise<Blob>,
-  ) {
+  async function openPreview(title: string, filename: string, loader: () => Promise<Blob>) {
     if (preview.blobUrl) URL.revokeObjectURL(preview.blobUrl)
-    setPreview({
-      open: true,
-      title,
-      filename,
-      blobUrl: null,
-      loading: true,
-      error: null,
-    })
+    setPreview({ open: true, title, filename, blobUrl: null, loading: true, error: null })
     try {
       const blob = await loader()
       const url = URL.createObjectURL(blob)
-      setPreview({
-        open: true,
-        title,
-        filename,
-        blobUrl: url,
-        loading: false,
-        error: null,
-      })
+      setPreview({ open: true, title, filename, blobUrl: url, loading: false, error: null })
     } catch (err) {
       setPreview({
         open: true,
@@ -407,21 +425,19 @@ export default function App() {
   function goTab(next: Tab) {
     setTab(next)
     setError(null)
-    if (next === 'cafeteria') {
-      setCafeDate(todayISO())
-    } else if (next === 'attendance') {
-      selectPeriodMode(period)
-    }
+    if (next === 'cafeteria') setCafeDate(todayISO())
+    else if (next === 'attendance') applyPeriod(period)
     setListEntryKey((k) => k + 1)
   }
 
   function onDevRoleChange(role: AppRole) {
     setDevRole(role)
     setDevRoleState(role)
-    setTab(role === ROLE_SERVICIOS ? 'cafeteria' : 'cafeteria')
+    setTab(role === ROLE_SERVICIOS ? 'cafeteria' : canAccessAttendance() ? 'attendance' : 'cafeteria')
     setListEntryKey((k) => k + 1)
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <>
       <aside className="sidebar">
@@ -472,7 +488,9 @@ export default function App() {
           )}
         </nav>
         <div className="sidebar-foot">
-          {health?.auth_disabled ? 'Auth local desactivada' : `API · ${health?.client_id ?? 'biometrico'}`}
+          {health?.auth_disabled
+            ? 'Auth local desactivada'
+            : `API · ${health?.client_id ?? 'biometrico'}`}
         </div>
       </aside>
 
@@ -540,411 +558,175 @@ export default function App() {
 
         <div className="content module-fluid">
           <div className="layout">
-        {tab === 'linkage' ? (
-          <PersonLinkagePanel biometricSiteId={siteId || undefined} />
-        ) : tab === 'devices' ? (
-          <DevicesPanel />
-        ) : tab === 'cafeteria' ? (
-          <section className="glass panel">
-            <h1 className="panel__title visually-hidden">Cierre diario de comedor</h1>
+            {tab === 'linkage' ? (
+              <PersonLinkagePanel biometricSiteId={siteId || undefined} />
+            ) : tab === 'devices' ? (
+              <DevicesPanel />
+            ) : tab === 'cafeteria' ? (
+              <section className="glass panel">
+                <h2 className="panel__title visually-hidden">Cierre diario de comedor</h2>
 
-            <div className="controls">
-              <div className="field">
-                <label htmlFor="cafe-date">Fecha</label>
-                <input
-                  id="cafe-date"
-                  type="date"
-                  max={maxDate}
-                  value={cafeDate}
-                  onChange={(e) => {
-                    setCafeDate(clampToToday(e.target.value))
-                    setCafeteria(null)
-                    setError(null)
-                  }}
-                />
-              </div>
-              <div className="actions">
-                {canGenerateReports() && (
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    onClick={() => void loadCafeteria()}
-                    disabled={loading || !!cafeteriaDateError}
-                  >
-                    Generar
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() =>
-                    void openPreview(
-                      'Cierre Diario — Comedor',
-                      `comedor_${clampToToday(cafeDate)}.pdf`,
-                      () => {
-                        const safeDate = clampToToday(cafeDate)
-                        const cafeErr = validateDateRange(safeDate, safeDate, maxDate)
-                        if (cafeErr) return Promise.reject(new Error(cafeErr))
-                        return fetchCafeteriaPdfBlob(safeDate, siteId || null)
-                      },
-                    )
-                  }
-                  disabled={!cafeteria || !!cafeteriaDateError}
-                >
-                  PDF
-                </button>
-              </div>
-            </div>
-            {cafeteriaDateError && <p className="period-anchor-hint" role="alert">{cafeteriaDateError}</p>}
-            {!canGenerateReports() && (
-              <p className="period-anchor-hint">
-                Listado de comedor (corte ≤ 09:00 e inclusiones ya autorizadas por GTH). Solo
-                impresión PDF; sin gestión de excepciones.
-              </p>
-            )}
-
-            <CafeteriaTable
-              report={cafeteria}
-              loading={loading}
-              error={error}
-              hideGthDetails={!canOperateGth()}
-            />
-
-            {cafeteria && !loading && canOperateGth() && (
-              <GthExceptionPanel
-                date={clampToToday(cafeDate)}
-                onChanged={() => {
-                  void loadCafeteria()
-                }}
-              />
-            )}
-          </section>
-        ) : (
-          <section className="glass panel">
-            <h1 className="panel__title visually-hidden">Asistencia — primera y última marca</h1>
-
-            <nav className="segmented segmented--periods" aria-label="Periodo de asistencia">
-              {ATTENDANCE_PERIODS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`segmented__btn ${period === item.id ? 'is-active' : ''}`}
-                  onClick={() => selectPeriodMode(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-
-            {(period === 'week' || period === 'quarter' || period === 'semester') && (
-              <p className="period-anchor-hint">
-                Rango: {formatDate(fromDate)} — {formatDate(toDate)}
-              </p>
-            )}
-
-            <div className="controls">
-              {period === 'month' && (
-                <>
+                <div className="controls">
                   <div className="field">
-                    <label htmlFor="month-select">Mes</label>
-                    <select
-                      id="month-select"
-                      value={monthIndexFromISO(anchorDate)}
+                    <label htmlFor="cafe-date">Fecha</label>
+                    <input
+                      id="cafe-date"
+                      type="date"
+                      max={maxDate}
+                      value={cafeDate}
                       onChange={(e) => {
-                        const monthIndex = Number(e.target.value)
-                        applyPeriod('month', anchorForMonth(yearFromISO(anchorDate), monthIndex))
+                        setCafeDate(clampToToday(e.target.value))
+                        setCafeteria(null)
+                        setError(null)
                       }}
-                    >
-                      {monthIndexes.map((index) => (
-                        <option key={MONTH_NAMES[index]} value={index}>
-                          {MONTH_NAMES[index]}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
-                  <div className="field">
-                    <label htmlFor="year-select">Año</label>
-                    <select
-                      id="year-select"
-                      value={yearFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const year = clampYear(Number(e.target.value))
-                        const months = selectableMonthIndexes(year)
-                        const preferred = monthIndexFromISO(anchorDate)
-                        const month = months.includes(preferred)
-                          ? preferred
-                          : (months[months.length - 1] ?? 0)
-                        applyPeriod('month', anchorForMonth(year, month))
-                      }}
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
 
-              {period === 'quarter' && (
-                <>
-                  <div className="field field--grow">
-                    <label htmlFor="quarter-select">Trimestre</label>
-                    <select
-                      id="quarter-select"
-                      value={quarterIndexFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const quarter = Number(e.target.value) as QuarterIndex
-                        applyPeriod('quarter', anchorForQuarter(yearFromISO(anchorDate), quarter))
-                      }}
-                    >
-                      {quarterIndexes.map((index) => (
-                        <option key={QUARTER_LABELS[index]} value={index}>
-                          {QUARTER_LABELS[index]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="quarter-year">Año</label>
-                    <select
-                      id="quarter-year"
-                      value={yearFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const year = clampYear(Number(e.target.value))
-                        const allowed = selectableQuarterIndexes(year)
-                        const preferred = quarterIndexFromISO(anchorDate)
-                        const quarter = (allowed.includes(preferred)
-                          ? preferred
-                          : (allowed[allowed.length - 1] ?? 0)) as QuarterIndex
-                        applyPeriod('quarter', anchorForQuarter(year, quarter))
-                      }}
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {period === 'semester' && (
-                <>
-                  <div className="field field--grow">
-                    <label htmlFor="semester-select">Semestre</label>
-                    <select
-                      id="semester-select"
-                      value={semesterIndexFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const semester = Number(e.target.value) as SemesterIndex
-                        applyPeriod(
-                          'semester',
-                          anchorForSemester(yearFromISO(anchorDate), semester),
-                        )
-                      }}
-                    >
-                      {semesterIndexes.map((index) => (
-                        <option key={SEMESTER_LABELS[index]} value={index}>
-                          {SEMESTER_LABELS[index]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="semester-year">Año</label>
-                    <select
-                      id="semester-year"
-                      value={yearFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const year = clampYear(Number(e.target.value))
-                        const allowed = selectableSemesterIndexes(year)
-                        const preferred = semesterIndexFromISO(anchorDate)
-                        const semester = (allowed.includes(preferred)
-                          ? preferred
-                          : (allowed[allowed.length - 1] ?? 0)) as SemesterIndex
-                        applyPeriod('semester', anchorForSemester(year, semester))
-                      }}
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {period === 'fortnight' && (
-                <>
-                  <div className="field field--grow">
-                    <label>Quincena</label>
-                    <div className="segmented segmented--half" role="group" aria-label="1Q o 2Q">
-                      {fortnightHalves.map((half) => (
-                        <button
-                          key={half}
-                          type="button"
-                          className={`segmented__btn ${fortnightHalfFromISO(anchorDate) === half ? 'is-active' : ''}`}
-                          onClick={() =>
-                            applyPeriod(
-                              'fortnight',
-                              anchorForFortnight(
-                                yearFromISO(anchorDate),
-                                monthIndexFromISO(anchorDate),
-                                half,
-                              ),
-                            )
-                          }
-                        >
-                          {half}
-                        </button>
-                      ))}
+                  {/* Countdown de corte de comedor */}
+                  {cafeCountdown && (
+                    <div className={`cafe-countdown ${cafeCountdown.urgent ? 'cafe-countdown--urgent' : ''}`}
+                         aria-live="off">
+                      <span className="cafe-countdown__label">Corte en</span>
+                      <span className="cafe-countdown__time">{cafeCountdown.label}</span>
                     </div>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="fortnight-month">Mes</label>
-                    <select
-                      id="fortnight-month"
-                      value={monthIndexFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const monthIndex = Number(e.target.value)
-                        const halves = selectableFortnightHalves(
-                          yearFromISO(anchorDate),
-                          monthIndex,
-                        )
-                        const preferred = fortnightHalfFromISO(anchorDate)
-                        const half = halves.includes(preferred)
-                          ? preferred
-                          : (halves[halves.length - 1] ?? '1Q')
-                        applyPeriod(
-                          'fortnight',
-                          anchorForFortnight(yearFromISO(anchorDate), monthIndex, half),
-                        )
-                      }}
-                    >
-                      {monthIndexes.map((index) => (
-                        <option key={MONTH_NAMES[index]} value={index}>
-                          {MONTH_NAMES[index]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="fortnight-year">Año</label>
-                    <select
-                      id="fortnight-year"
-                      value={yearFromISO(anchorDate)}
-                      onChange={(e) => {
-                        const year = clampYear(Number(e.target.value))
-                        const months = selectableMonthIndexes(year)
-                        const preferredMonth = monthIndexFromISO(anchorDate)
-                        const month = months.includes(preferredMonth)
-                          ? preferredMonth
-                          : (months[months.length - 1] ?? 0)
-                        const halves = selectableFortnightHalves(year, month)
-                        const preferredHalf = fortnightHalfFromISO(anchorDate)
-                        const half = halves.includes(preferredHalf)
-                          ? preferredHalf
-                          : (halves[halves.length - 1] ?? '1Q')
-                        applyPeriod('fortnight', anchorForFortnight(year, month, half))
-                      }}
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
+                  )}
 
-              {(period === 'day' || period === 'week') && (
-                <div className="field">
-                  <label htmlFor="anchor-date">
-                    {period === 'day' ? 'Fecha específica' : 'Semana (elige un día)'}
-                  </label>
-                  <input
-                    id="anchor-date"
-                    type="date"
-                    max={maxDate}
-                    value={anchorDate}
-                    onChange={(e) => applyPeriod(period, e.target.value)}
-                  />
+                  <div className="actions">
+                    {canGenerateReports() && (
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        onClick={() => void loadCafeteria()}
+                        disabled={loading || !!cafeteriaDateError}
+                      >
+                        Generar
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() =>
+                        void openPreview(
+                          'Cierre Diario — Comedor',
+                          `comedor_${clampToToday(cafeDate)}.pdf`,
+                          () => {
+                            const safeDate = clampToToday(cafeDate)
+                            const cafeErr = validateDateRange(safeDate, safeDate, maxDate)
+                            if (cafeErr) return Promise.reject(new Error(cafeErr))
+                            return fetchCafeteriaPdfBlob(safeDate, siteId || null)
+                          },
+                        )
+                      }
+                      disabled={!cafeteria || !!cafeteriaDateError}
+                    >
+                      PDF
+                    </button>
+                  </div>
                 </div>
-              )}
 
-              {period === 'week' && (
-                <>
-                  <div className="field">
-                    <label htmlFor="from-date">Desde</label>
-                    <input
-                      id="from-date"
-                      type="date"
-                      value={fromDate}
-                      readOnly
-                      disabled
-                      title="Se calcula automáticamente según la semana"
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="to-date">Hasta</label>
-                    <input
-                      id="to-date"
-                      type="date"
-                      value={toDate}
-                      readOnly
-                      disabled
-                      title="Hasta hoy si la semana aún no termina"
-                    />
-                  </div>
-                </>
-              )}
+                {cafeteriaDateError && (
+                  <p className="period-anchor-hint" role="alert">
+                    {cafeteriaDateError}
+                  </p>
+                )}
+                {!canGenerateReports() && (
+                  <p className="period-anchor-hint">
+                    Listado de comedor (corte ≤ 09:00 e inclusiones ya autorizadas por GTH). Solo
+                    impresión PDF; sin gestión de excepciones.
+                  </p>
+                )}
 
-              <div className="actions">
-                {canGenerateReports() && (
+                {/* Carga progresiva: overlay cuando ya hay data y se está recargando */}
+                <div className="table-progressive-wrap">
+                  <CafeteriaTable
+                    report={cafeteria}
+                    loading={loading && !cafeteria}
+                    error={!loading ? error : null}
+                    hideGthDetails={!canOperateGth()}
+                  />
+                  {loading && cafeteria && (
+                    <div className="table-progressive-overlay" aria-busy="true">
+                      <span className="spinner" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
+
+                {cafeteria && !loading && canOperateGth() && (
+                  <GthExceptionPanel
+                    date={clampToToday(cafeDate)}
+                    onChanged={() => { void loadCafeteria() }}
+                  />
+                )}
+              </section>
+            ) : (
+              <section className="glass panel">
+                <h2 className="panel__title visually-hidden">
+                  Asistencia — primera y última marca
+                </h2>
+
+                {/* Selector de periodo (extraído) */}
+                <PeriodSelector
+                  period={period}
+                  anchorDate={anchorDate}
+                  fromDate={fromDate}
+                  toDate={toDate}
+                  maxDate={maxDate}
+                  onApply={applyPeriod}
+                />
+
+                <div className="actions" style={{ marginTop: '4px', marginBottom: '18px' }}>
+                  {canGenerateReports() && (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => void loadAttendance()}
+                      disabled={loading || !!attendanceRangeError}
+                    >
+                      Generar
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="btn btn--primary"
-                    onClick={() => void loadAttendance()}
-                    disabled={loading || !!attendanceRangeError}
+                    className="btn btn--ghost"
+                    onClick={() =>
+                      void openPreview(
+                        'Control de Asistencia',
+                        `asistencia_${fromDate}_${toDate}.pdf`,
+                        () => {
+                          const safe = clampRangeToToday(fromDate, toDate, maxDate)
+                          const rangeErr = validateDateRange(safe.from, safe.to, maxDate)
+                          if (rangeErr) return Promise.reject(new Error(rangeErr))
+                          return fetchAttendancePdfBlob(safe.from, safe.to, siteId || null)
+                        },
+                      )
+                    }
+                    disabled={!attendance || !!attendanceRangeError}
                   >
-                    Generar
+                    PDF
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() =>
-                    void openPreview(
-                      'Control de Asistencia',
-                      `asistencia_${fromDate}_${toDate}.pdf`,
-                      () => {
-                        const safe = clampRangeToToday(fromDate, toDate, maxDate)
-                        const rangeErr = validateDateRange(safe.from, safe.to, maxDate)
-                        if (rangeErr) return Promise.reject(new Error(rangeErr))
-                        return fetchAttendancePdfBlob(safe.from, safe.to, siteId || null)
-                      },
-                    )
-                  }
-                  disabled={!attendance || !!attendanceRangeError}
-                >
-                  PDF
-                </button>
-              </div>
-            </div>
-            {attendanceRangeError && (
-              <p className="period-anchor-hint" role="alert">
-                {attendanceRangeError}
-              </p>
-            )}
+                </div>
 
-            <AttendanceTable report={attendance} loading={loading} error={error} />
-          </section>
-        )}
+                {attendanceRangeError && (
+                  <p className="period-anchor-hint" role="alert">
+                    {attendanceRangeError}
+                  </p>
+                )}
+
+                {/* Carga progresiva: overlay cuando ya hay data y se está recargando */}
+                <div className="table-progressive-wrap">
+                  <AttendanceTable
+                    report={attendance}
+                    loading={loading && !attendance}
+                    error={!loading ? error : null}
+                  />
+                  {loading && attendance && (
+                    <div className="table-progressive-overlay" aria-busy="true">
+                      <span className="spinner" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </main>

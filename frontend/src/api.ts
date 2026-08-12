@@ -107,13 +107,30 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+async function apiFetch(path: string, init?: RequestInit, retries = 2): Promise<Response> {
   const headers = authHeaders(init?.headers)
-  return fetch(`${API}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers,
-  })
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API}${path}`, {
+        ...init,
+        credentials: 'include',
+        headers,
+      })
+      // Retry solo en errores de servidor (5xx), no en auth/cliente
+      if (!res.ok && res.status >= 500 && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 300 * Math.pow(2, attempt)))
+        continue
+      }
+      return res
+    } catch (err) {
+      lastErr = err
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 300 * Math.pow(2, attempt)))
+      }
+    }
+  }
+  throw lastErr ?? new Error('Error de red')
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -373,14 +390,6 @@ export async function fetchPresenceReport(opts: {
   const res = await apiFetch(`/person-linkage/presence?${params}`)
   if (!res.ok) throw new Error(await parseError(res))
   return res.json()
-}
-
-export function todayISO(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
 }
 
 /** Fecha visible: día/mes/año (ej. 15/07/2026). Acepta YYYY-MM-DD o ISO. */

@@ -119,6 +119,20 @@ body.albatros-admin #root .sidebar-foot {
   gap: 1rem;
 }
 
+.albatros-admin .btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text, #dde1ed);
+  transition: opacity 0.2s ease;
+}
+
 .albatros-admin .btn.btn--primary,
 .albatros-admin .btn--primary {
   background: var(--accent, #0082c9);

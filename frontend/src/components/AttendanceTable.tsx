@@ -7,6 +7,7 @@ import {
   getAttendanceFlags,
   rowToneClass,
 } from '../attendanceFlags'
+import { downloadCSV } from '../csvExport'
 import { formatEmployeeName } from '../formatEmployeeName'
 import { todayISO } from '../periodRange'
 import { usePageSize } from '../usePageSize'
@@ -21,10 +22,18 @@ type Props = {
 export function AttendanceTable({ report, loading, error }: Props) {
   const pageSize = usePageSize(25, 10)
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
 
+  // Resetear búsqueda y página al cargar un nuevo reporte
   useEffect(() => {
     setPage(1)
-  }, [report?.from_date, report?.to_date, report?.rows.length, pageSize])
+    setSearch('')
+  }, [report?.from_date, report?.to_date])
+
+  // Resetear página al cambiar búsqueda o tamaño
+  useEffect(() => {
+    setPage(1)
+  }, [search, pageSize])
 
   const summary = useMemo(() => {
     if (!report) return { late: 0, missingExit: 0 }
@@ -39,6 +48,46 @@ export function AttendanceTable({ report, loading, error }: Props) {
     return { late, missingExit }
   }, [report])
 
+  /** Filas filtradas por búsqueda local */
+  const filtered = useMemo(() => {
+    if (!report) return []
+    if (!search.trim()) return report.rows
+    const q = search.toLowerCase().trim()
+    return report.rows.filter(
+      (row) =>
+        formatEmployeeName(row.employee_name).toLowerCase().includes(q) ||
+        row.employee_id.toLowerCase().includes(q) ||
+        (row.department?.toLowerCase() ?? '').includes(q),
+    )
+  }, [report, search])
+
+  function handleCSV() {
+    if (!report) return
+    downloadCSV(
+      `asistencia_${report.from_date}_${report.to_date}.csv`,
+      ['#', 'Fecha', 'Empleado', 'ID', 'Departamento', 'Entrada', 'Demora (min)', 'Salida'],
+      filtered.map((row, i) => {
+        const flags = getAttendanceFlags(row.first_seen_at, row.last_seen_at, row.date)
+        return [
+          i + 1,
+          row.date,
+          formatEmployeeName(row.employee_name),
+          row.employee_id,
+          row.department || '',
+          formatTime(row.first_seen_at),
+          flags.delayMinutes ?? '',
+          row.last_seen_at
+            ? formatTime(row.last_seen_at)
+            : flags.missingExit
+              ? 'Sin marca'
+              : flags.dayInProgress
+                ? 'Día en curso'
+                : '',
+        ]
+      }),
+    )
+  }
+
   if (loading) {
     return (
       <div className="loading">
@@ -49,7 +98,11 @@ export function AttendanceTable({ report, loading, error }: Props) {
   }
 
   if (error) {
-    return <div className="error">{error}</div>
+    return (
+      <div className="error" role="alert">
+        {error}
+      </div>
+    )
   }
 
   if (!report) {
@@ -60,10 +113,10 @@ export function AttendanceTable({ report, loading, error }: Props) {
     return <div className="empty">Sin marcas en el periodo indicado.</div>
   }
 
-  const totalPages = Math.max(1, Math.ceil(report.rows.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * pageSize
-  const slice = report.rows.slice(start, start + pageSize)
+  const slice = filtered.slice(start, start + pageSize)
 
   return (
     <>
@@ -94,6 +147,33 @@ export function AttendanceTable({ report, loading, error }: Props) {
             <span className="stat__value stat__value--soft-warn">{summary.missingExit}</span>
           </div>
         )}
+      </div>
+
+      {/* Barra de búsqueda + CSV */}
+      <div className="table-toolbar">
+        <input
+          className="table-search"
+          type="search"
+          placeholder="Buscar nombre, cédula, departamento…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Filtrar registros de asistencia"
+        />
+        <div className="table-toolbar__right">
+          {search.trim() !== '' && (
+            <span className="table-toolbar__count" aria-live="polite">
+              {filtered.length} de {report.rows.length}
+            </span>
+          )}
+          <button
+            type="button"
+            className="btn btn--ghost btn--page"
+            onClick={handleCSV}
+            title="Exportar registros visibles a CSV"
+          >
+            CSV ↓
+          </button>
+        </div>
       </div>
 
       <p className="attendance-legend" aria-hidden>
@@ -154,6 +234,13 @@ export function AttendanceTable({ report, loading, error }: Props) {
                 </tr>
               )
             })}
+            {slice.length === 0 && (
+              <tr>
+                <td colSpan={7} className="empty">
+                  Sin resultados para &ldquo;{search}&rdquo;
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -161,7 +248,7 @@ export function AttendanceTable({ report, loading, error }: Props) {
       <PaginationBar
         page={safePage}
         pageSize={pageSize}
-        total={report.rows.length}
+        total={filtered.length}
         onChange={setPage}
       />
     </>

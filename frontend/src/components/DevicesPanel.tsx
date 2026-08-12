@@ -314,8 +314,8 @@ export function DevicesPanel() {
           <footer className="devices-panel__footer">
             Usuario ISAPI <strong>{data.user}</strong>
             {data.use_https ? ' · HTTPS' : ' · HTTP'} · Corte comedor{' '}
-            {data.cafeteria_cutoff.slice(0, 5)} · Excepciones GTH hasta{' '}
-            {data.cafeteria_late_end.slice(0, 5)}
+            {(data.cafeteria_cutoff || '').slice(0, 5)} · Excepciones GTH hasta{' '}
+            {(data.cafeteria_late_end || '').slice(0, 5)}
           </footer>
         </>
       )}
