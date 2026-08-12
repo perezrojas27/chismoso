@@ -392,7 +392,15 @@ class HikvisionConnector(AccessEventSource):
         """
         Prueba real: Digest + deviceInfo + búsqueda AcsEvent del día.
         Devuelve muestras visibles para demostrar conexión establecida.
+        Reintenta una vez ante 401/403 (falsos positivos ocasionales en Digest).
         """
+        result = await self._probe_once()
+        if result.get("reachable") and result.get("auth_ok") is False:
+            await asyncio.sleep(0.35)
+            result = await self._probe_once()
+        return result
+
+    async def _probe_once(self) -> dict:
         auth = httpx.DigestAuth(
             self.settings.effective_hikvision_user(),
             self.settings.effective_hikvision_password(),
@@ -890,6 +898,7 @@ class MultiDeviceHikvisionSource(AccessEventSource):
 
 
 async def probe_hikvision_devices(settings: Settings) -> list[dict]:
+    """Sonda cada dispositivo en serie (evita 401 intermitentes con Digest paralelo)."""
     connectors = [
         HikvisionConnector(
             settings,
@@ -899,7 +908,10 @@ async def probe_hikvision_devices(settings: Settings) -> list[dict]:
         )
         for device in settings.parsed_hikvision_devices()
     ]
-    return list(await asyncio.gather(*[c.probe() for c in connectors]))
+    results: list[dict] = []
+    for connector in connectors:
+        results.append(await connector.probe())
+    return results
 
 
 def create_event_source(settings: Settings) -> AccessEventSource:
