@@ -16,8 +16,8 @@
         <p class="eyebrow">Agente de sede · Albatros</p>
         <h1>Consola de biométricos</h1>
         <p class="lead">
-          Herramienta local (como el software Hikvision): detecta y configura
-          relojes en la red de esta oficina. No sustituye al portal INTEGRADO.
+          Herramienta local: detecta y configura relojes en la red de esta oficina.
+          No sustituye al portal INTEGRADO.
         </p>
         <form id="form-login">
           <label>Usuario
@@ -45,21 +45,47 @@
       </header>
 
       <div class="grid">
-        <aside class="panel">
-          <h2>Credenciales del reloj</h2>
-          <p class="muted">
-            Usuario y clave ISAPI del terminal Hikvision. Se guardan solo en este servidor.
-          </p>
-          <form id="form-isapi">
-            <label>Usuario ISAPI
-              <input id="isapi-user" value="admin" required />
-            </label>
-            <label>Contraseña ISAPI
-              <input id="isapi-pass" type="password" required placeholder="••••••••" />
-            </label>
-            <button type="submit" class="btn primary">Guardar clave del reloj</button>
-          </form>
-          <p id="isapi-status" class="muted"></p>
+        <aside class="side-stack">
+          <div class="panel">
+            <h2>Credenciales del reloj</h2>
+            <p class="muted">
+              Usuario y clave <strong>ISAPI</strong> del terminal Hikvision.
+              Solo en este servidor (no es la clave de esta consola).
+            </p>
+            <form id="form-isapi">
+              <label>Usuario ISAPI
+                <input id="isapi-user" value="admin" required />
+              </label>
+              <label>Contraseña ISAPI
+                <input id="isapi-pass" type="password" required placeholder="••••••••" autocomplete="new-password" />
+              </label>
+              <button type="submit" class="btn primary">Guardar clave del reloj</button>
+            </form>
+            <p id="isapi-status" class="muted"></p>
+          </div>
+
+          <div class="panel">
+            <h2>Acceso a esta consola</h2>
+            <p class="muted">
+              Usuario y contraseña para entrar a <em>esta aplicación</em> en el agente de sede.
+            </p>
+            <form id="form-console-auth">
+              <label>Usuario de consola
+                <input id="console-user" autocomplete="username" />
+              </label>
+              <label id="label-console-current">Contraseña actual
+                <input id="console-current" type="password" autocomplete="current-password" />
+              </label>
+              <label>Nueva contraseña (mín. 8)
+                <input id="console-new" type="password" autocomplete="new-password" required minlength="8" />
+              </label>
+              <label>Confirmar nueva
+                <input id="console-confirm" type="password" autocomplete="new-password" required minlength="8" />
+              </label>
+              <button type="submit" class="btn primary">Guardar acceso</button>
+            </form>
+            <p id="console-auth-hint" class="muted"></p>
+          </div>
         </aside>
 
         <section class="panel grow">
@@ -82,11 +108,13 @@
           </div>
 
           <form id="form-add" class="add-form hidden">
+            <input type="hidden" id="add-device-id" value="" />
+            <p id="form-add-title" class="form-title">Nuevo dispositivo</p>
             <label>IP / host <input id="add-host" required placeholder="192.168.10.201" /></label>
             <label>Puerto <input id="add-port" type="number" value="80" min="1" max="65535" required /></label>
             <label>Ubicación <input id="add-location" required placeholder="Ej. Ascensores Torre" /></label>
-            <div class="row">
-              <button type="submit" class="btn primary">Guardar dispositivo</button>
+            <div class="row form-actions">
+              <button type="submit" class="btn primary" id="btn-save-device">Guardar dispositivo</button>
               <button type="button" id="btn-add-cancel" class="btn ghost">Cancelar</button>
             </div>
           </form>

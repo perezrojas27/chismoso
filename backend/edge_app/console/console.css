@@ -107,11 +107,17 @@ input:focus {
 
 .grid {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 16px;
 }
 @media (max-width: 860px) {
   .grid { grid-template-columns: 1fr; }
+}
+.side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 .panel {
   background: var(--panel);
@@ -129,6 +135,15 @@ input:focus {
   margin-bottom: 12px;
 }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+.row.actions { justify-content: flex-end; }
+.form-title {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 13px;
+}
+.form-actions { grid-column: 1 / -1; }
 .scan-bar {
   display: flex;
   gap: 10px;

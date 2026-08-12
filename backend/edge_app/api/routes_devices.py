@@ -86,7 +86,9 @@ async def list_devices(settings: Settings = Depends(get_settings)) -> dict:
             "error": None,
             "online": None,
             "origin": "managed" if d.device_id in managed_ids else "env",
-            "removable": d.device_id in managed_ids and d.device_id not in env_ids,
+            "removable": d.device_id in managed_ids,
+            "editable": True,
+            "still_in_env": d.device_id in env_ids,
         }
         for d in configured
     ]
@@ -142,6 +144,8 @@ async def list_devices(settings: Settings = Depends(get_settings)) -> dict:
                 "search": item.get("search"),
                 "origin": meta.get("origin", "env"),
                 "removable": bool(meta.get("removable")),
+                "editable": True,
+                "still_in_env": bool(meta.get("still_in_env")),
             }
         )
 
@@ -273,6 +277,95 @@ async def create_device(
     }
 
 
+@router.put("/{device_id}")
+async def update_device(
+    device_id: str,
+    body: ManagedDeviceCreate,
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Edita un dispositivo manteniendo el ID interno (host/puerto/ubicación)."""
+    key = device_id.strip().upper()
+    env_ids = {d.device_id for d in settings._parse_env_hikvision_devices()}
+    managed_ids = {d.device_id for d in get_device_registry().list_devices()}
+    known = env_ids | managed_ids | {
+        d.device_id for d in settings.parsed_hikvision_devices()
+    }
+    if key not in known:
+        raise HTTPException(status_code=404, detail=f"Dispositivo {key} no encontrado")
+
+    try:
+        payload = body.model_dump()
+        payload["device_id"] = key
+        device = ManagedDevice.model_validate(payload)
+    except ValidationError as exc:
+        first = exc.errors()[0] if exc.errors() else None
+        msg = str(first.get("msg") if first else exc)
+        raise HTTPException(status_code=400, detail=msg) from exc
+
+    saved = get_device_registry().upsert(device)
+    return {
+        "device": saved.model_dump(),
+        "origin": "managed",
+        "overrides_env": key in env_ids,
+        "message": (
+            f"Dispositivo {key} actualizado"
+            + (" (sobrescribe .env)" if key in env_ids else "")
+            + "."
+        ),
+    }
+
+
+@router.post("/{device_id}/probe")
+async def probe_device(
+    device_id: str,
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Sonda ISAPI de un solo dispositivo configurado."""
+    key = device_id.strip().upper()
+    devices = {d.device_id: d for d in settings.parsed_hikvision_devices()}
+    cfg = devices.get(key)
+    if not cfg:
+        raise HTTPException(status_code=404, detail=f"Dispositivo {key} no encontrado")
+
+    source = (settings.source or "mock").strip().lower()
+    if source != "hikvision":
+        return {
+            "device_id": key,
+            "online": False,
+            "message": "Fuente en modo mock: no hay sonda real.",
+        }
+
+    from edge_app.services.hikvision_connector import HikvisionConnector
+
+    connector = HikvisionConnector(
+        settings,
+        device_id=cfg.device_id,
+        host=cfg.host,
+        port=cfg.port,
+    )
+    item = await connector.probe()
+    reachable = bool(item.get("reachable"))
+    auth_ok = item.get("auth_ok")
+    online = reachable and (auth_ok is True or auth_ok is None)
+    if online:
+        message = "Conexión establecida"
+    elif reachable and auth_ok is False:
+        message = "Clave ISAPI incorrecta"
+    else:
+        message = item.get("error") or "Sin conexión"
+    return {
+        "device_id": key,
+        "host": item.get("host") or cfg.host,
+        "port": cfg.port,
+        "reachable": reachable,
+        "auth_ok": auth_ok,
+        "online": online,
+        "device_label": item.get("device_label"),
+        "error": item.get("error"),
+        "message": message,
+    }
+
+
 @router.delete("/{device_id}")
 async def delete_device(
     device_id: str,
@@ -289,7 +382,7 @@ async def delete_device(
                 status_code=400,
                 detail=(
                     f"{key} está definido en HIKVISION_DEVICES (.env). "
-                    "Elimínelo allí o sobrescriba desde este panel y luego quítelo."
+                    "Edítelo desde este panel (queda en registro UI) o elimínelo del .env."
                 ),
             )
         raise HTTPException(status_code=404, detail=f"Dispositivo {key} no encontrado")

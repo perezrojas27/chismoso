@@ -26,11 +26,31 @@ class LoginBody(BaseModel):
 
 
 def _admin_user(settings: Settings) -> str:
+    try:
+        from edge_app.services.console_auth_secrets import load_console_auth
+
+        stored = load_console_auth()
+        if stored and stored.get("username"):
+            return stored["username"]
+    except Exception:
+        pass
     return (settings.edge_admin_user or "admin").strip() or "admin"
 
 
 def _admin_password(settings: Settings) -> str:
+    try:
+        from edge_app.services.console_auth_secrets import load_console_auth
+
+        stored = load_console_auth()
+        if stored and stored.get("password"):
+            return stored["password"]
+    except Exception:
+        pass
     return (settings.edge_admin_password or "").strip()
+
+
+def _revoke_all_sessions() -> None:
+    _sessions.clear()
 
 
 def _password_ok(provided: str, expected: str) -> bool:
@@ -118,7 +138,7 @@ def console_status(settings: Settings = Depends(get_settings)) -> dict[str, Any]
         "site_code": settings.site_code,
         "site_name": settings.site_name,
         "auth_required": bool(pwd),
-        "default_username": _admin_user(settings) if pwd else "",
+        "default_username": _admin_user(settings) if pwd else _admin_user(settings),
         "isapi_user": settings.effective_hikvision_user(),
         "isapi_password_configured": bool(isapi_pwd),
         "source": settings.source,
@@ -191,4 +211,56 @@ def save_isapi_credentials(
         "isapi_user": body.username.strip(),
         "isapi_password_configured": True,
         "site_code": settings.site_code,
+    }
+
+
+class ChangeConsolePasswordBody(BaseModel):
+    current_password: str = Field(default="", max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+    new_username: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/change-password")
+def change_console_password(
+    body: ChangeConsolePasswordBody,
+    session: dict = Depends(require_edge_console_auth),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """
+    Cambia usuario/clave de la consola local (persistido en data/console_auth.json).
+    Si aún no hay clave (lab abierto), current_password puede ir vacío.
+    """
+    from edge_app.services.console_auth_secrets import save_console_auth
+
+    expected = _admin_password(settings)
+    if expected:
+        if not _password_ok(body.current_password or "", expected):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="La contraseña actual de la consola no es correcta.",
+            )
+    elif (body.current_password or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La consola aún no tiene clave; deje «contraseña actual» vacía.",
+        )
+
+    new_pwd = body.new_password.strip()
+    if len(new_pwd) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 8 caracteres.",
+        )
+
+    new_user = (body.new_username or "").strip() or _admin_user(settings)
+    save_console_auth(new_user, new_pwd)
+    _revoke_all_sessions()
+    token = issue_session(new_user)
+    return {
+        "message": "Contraseña de la consola actualizada. Sesión renovada.",
+        "username": new_user,
+        "auth_required": True,
+        "token": token,
+        "expires_in_seconds": _SESSION_TTL_SEC,
+        "previous_open_mode": bool(session.get("open")),
     }

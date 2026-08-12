@@ -5,7 +5,7 @@
 **Módulo:** `client_id=biometrico`  
 **Análogo:** vinculación correo ↔ GTH (`/api/hr/employee-linkage`, `gth-vinculo-correo.html`)  
 **Labs:** oficina `:8090` y casero `:8080` (cloud bio en casero desde `4f36eaa`).  
-**Prod:** no — ver [`SEMANA_UAT_LABS_SIN_PROD_20260808.md`](SEMANA_UAT_LABS_SIN_PROD_20260808.md).
+**Prod:** no — ver [`SEMANA_UAT_LABS_SIN_PROD_20260808.md`](https://github.com/jpvalor-pololo/INTEGRADO/blob/main/docs/guias/SEMANA_UAT_LABS_SIN_PROD_20260808.md).
 
 ## Problema
 

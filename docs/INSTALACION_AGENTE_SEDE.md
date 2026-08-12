@@ -87,6 +87,8 @@ ssh -i ~/.ssh/id_ed25519_albatros_oficina -o IdentitiesOnly=yes jvalor@192.168.1
 - Código edge + consola UI actualizados en `C:\AlbatrosEdge\backend`.
 - Servicio `Albatros Edge Service` reinstalado/arrancado (WinSW).
 - Login consola: usuario `admin` + `EDGE_ADMIN_PASSWORD` (en `C:\AlbatrosEdge\backend\.env`; no en git).
+  También se puede cambiar desde la UI («Acceso a esta consola» → `data/console_auth.json`).
+- Acciones UI: editar dispositivo, probar ISAPI, quitar del registro managed.
 - Si `http://192.168.10.31:8003/` no abre desde otra VLAN, usar túnel:
 
 ```bash
