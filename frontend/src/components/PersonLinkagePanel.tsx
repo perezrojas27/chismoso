@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   fetchBioLinkageActive,
   fetchBioPersonsUnlinked,
+  fetchCatalogSites,
   fetchPresenceReport,
   linkBioPerson,
   unlinkBioPerson,
   type BioLinkageItem,
   type BioPersonUnlinked,
+  type CatalogSite,
   type PresenceReport,
 } from '../api'
 import { todayISO } from '../periodRange'
@@ -17,50 +19,52 @@ type Props = {
 }
 
 export function PersonLinkagePanel({ biometricSiteId }: Props) {
-  const [q, setQ] = useState('')
-  const debouncedQ = useDebounce(q, 350)
+  const [qEmp, setQEmp] = useState('')
+  const [qBio, setQBio] = useState('')
+  const debouncedQEmp = useDebounce(qEmp, 350)
+  const debouncedQBio = useDebounce(qBio, 350)
   const [filter, setFilter] = useState<'all' | 'linked' | 'unlinked'>('unlinked')
 
   const [items, setItems] = useState<BioLinkageItem[]>([])
   const [stats, setStats] = useState({ active: 0, linked: 0, unlinked: 0 })
   const [persons, setPersons] = useState<BioPersonUnlinked[]>([])
 
-  // Empleado GTH seleccionado y persona biométrica a vincular
   const [selectedEmp, setSelectedEmp] = useState('')
   const [selectedPerson, setSelectedPerson] = useState('')
   const [manualPersonId, setManualPersonId] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
-  // Presencia
   const [presenceDate, setPresenceDate] = useState(() => todayISO())
   const [coreSiteId, setCoreSiteId] = useState('')
+  const [sites, setSites] = useState<CatalogSite[]>([])
   const [presence, setPresence] = useState<PresenceReport | null>(null)
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  // Usa debouncedQ para no disparar 2 requests por cada pulsación
   const refresh = useCallback(async () => {
     setError(null)
     const [emp, pers] = await Promise.all([
       fetchBioLinkageActive({
-        q: debouncedQ || undefined,
+        q: debouncedQEmp || undefined,
         link_filter: filter,
       }),
       fetchBioPersonsUnlinked({
-        q: debouncedQ || undefined,
+        q: debouncedQBio || undefined,
         site_id: biometricSiteId || undefined,
       }),
     ])
     setItems(emp.items)
     setStats(emp.stats)
     setPersons(pers.items)
-    setSelectedEmp((prev) => {
-      if (prev && emp.items.some((i) => i.employee_id === prev)) return prev
-      const firstUnlinked = emp.items.find((i) => !i.linked)
-      return (firstUnlinked || emp.items[0])?.employee_id || ''
-    })
-  }, [debouncedQ, filter, biometricSiteId])
+    setSelectedEmp((prev) =>
+      prev && emp.items.some((i) => i.employee_id === prev) ? prev : '',
+    )
+    setSelectedPerson((prev) =>
+      prev && pers.items.some((p) => p.person_external_id === prev) ? prev : '',
+    )
+  }, [debouncedQEmp, debouncedQBio, filter, biometricSiteId])
 
   useEffect(() => {
     void refresh().catch((err: unknown) => {
@@ -68,20 +72,37 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
     })
   }, [refresh])
 
-  async function handleLink() {
-    const personId = manualPersonId.trim() || selectedPerson
-    if (!selectedEmp || !personId) {
-      setError('Elija un empleado GTH y seleccione o escriba un ID biométrico')
+  useEffect(() => {
+    void fetchCatalogSites()
+      .then(setSites)
+      .catch(() => setSites([]))
+  }, [])
+
+  const selectedEmpData = items.find((i) => i.employee_id === selectedEmp)
+  const selectedPersonData = persons.find((p) => p.person_external_id === selectedPerson)
+  const effectivePerson = manualPersonId.trim() || selectedPerson
+  const personLabel =
+    manualPersonId.trim() ||
+    (selectedPersonData
+      ? `${selectedPersonData.person_external_id}${
+          selectedPersonData.person_name ? ` — ${selectedPersonData.person_name}` : ''
+        }`
+      : effectivePerson)
+
+  async function handleLinkConfirmed() {
+    if (!selectedEmp || !effectivePerson) {
+      setError('Elija un empleado GTH y un ID biométrico')
       return
     }
     setBusy(true)
     setError(null)
     setMsg(null)
     try {
-      await linkBioPerson(selectedEmp, personId)
+      await linkBioPerson(selectedEmp, effectivePerson)
       setMsg('Vínculo guardado correctamente')
       setSelectedPerson('')
       setManualPersonId('')
+      setConfirmOpen(false)
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo vincular')
@@ -91,6 +112,13 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
   }
 
   async function handleUnlink(employeeId: string) {
+    const row = items.find((i) => i.employee_id === employeeId)
+    const ok = window.confirm(
+      row
+        ? `¿Desvincular a ${row.full_name} (${row.cedula}) del ID ${row.person_external_id}?`
+        : '¿Desvincular el empleado seleccionado?',
+    )
+    if (!ok) return
     setBusy(true)
     setError(null)
     setMsg(null)
@@ -107,7 +135,7 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
 
   async function handlePresence() {
     if (!coreSiteId.trim()) {
-      setError('Indique el UUID de sede GTH (core.sites) para el reporte de presencia')
+      setError('Seleccione la sede GTH para el reporte de presencia')
       return
     }
     setBusy(true)
@@ -127,54 +155,49 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
     }
   }
 
-  const selectedEmpData = items.find((i) => i.employee_id === selectedEmp)
-  const effectivePerson = manualPersonId.trim() || selectedPerson
+  const step =
+    !selectedEmp ? 1 : !effectivePerson ? 2 : confirmOpen ? 3 : 2
 
   return (
     <section className="glass panel">
       <h2 className="panel__title">Vínculo GTH ↔ biométrico</h2>
-      <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginBottom: '1.25rem' }}>
-        El reloj identifica personas con <code>employeeNo</code> (ID propio). Para saber quién
-        faltó por marcar en una sede hay que vincular ese ID con el empleado de GTH (cédula /
-        ficha), igual que la vinculación de correo corporativo.
+      <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginBottom: '1rem' }}>
+        El reloj identifica personas con <code>employeeNo</code> (ID propio). Vincule ese ID con
+        la ficha GTH (cédula), en tres pasos: elegir empleado → elegir ID → confirmar.
       </p>
 
-      {/* ── Controles de búsqueda ── */}
-      <div className="controls">
-        <div className="field">
-          <label htmlFor="bio-link-q">Buscar</label>
-          <input
-            id="bio-link-q"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Cédula o nombre…"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="bio-link-filter">Filtro</label>
-          <select
-            id="bio-link-filter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as typeof filter)}
+      <ol
+        className="linkage-steps"
+        style={{
+          display: 'flex',
+          gap: '0.75rem',
+          listStyle: 'none',
+          padding: 0,
+          margin: '0 0 1rem',
+          fontSize: '0.8rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        {[
+          { n: 1, label: 'Empleado GTH' },
+          { n: 2, label: 'ID biométrico' },
+          { n: 3, label: 'Confirmar' },
+        ].map((s) => (
+          <li
+            key={s.n}
+            style={{
+              padding: '0.35rem 0.75rem',
+              borderRadius: 8,
+              border: '1px solid var(--border, #333)',
+              background: step === s.n ? 'rgba(59,130,246,0.2)' : 'transparent',
+              fontWeight: step === s.n ? 600 : 400,
+            }}
           >
-            <option value="all">Todos</option>
-            <option value="unlinked">Sin vínculo</option>
-            <option value="linked">Vinculados</option>
-          </select>
-        </div>
-        <div className="actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            disabled={busy}
-            onClick={() => void refresh()}
-          >
-            Actualizar
-          </button>
-        </div>
-      </div>
+            {s.n}. {s.label}
+          </li>
+        ))}
+      </ol>
 
-      {/* ── Estadísticas ── */}
       <div className="stats">
         <div className="stat">
           <span className="stat__label">Activos GTH</span>
@@ -205,11 +228,32 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
         </p>
       )}
 
-      {/* ── Tablas de vinculación ── */}
       <div className="linkage-grid">
-        {/* Columna izquierda: Empleados GTH */}
         <div className="linkage-col">
-          <p className="linkage-col__heading">Empleados GTH</p>
+          <p className="linkage-col__heading">1 · Empleados GTH</p>
+          <div className="controls" style={{ marginBottom: '0.75rem' }}>
+            <div className="field">
+              <label htmlFor="bio-link-q-emp">Buscar empleado</label>
+              <input
+                id="bio-link-q-emp"
+                value={qEmp}
+                onChange={(e) => setQEmp(e.target.value)}
+                placeholder="Cédula o nombre…"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="bio-link-filter">Filtro vínculo</label>
+              <select
+                id="bio-link-filter"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as typeof filter)}
+              >
+                <option value="all">Todos</option>
+                <option value="unlinked">Sin vínculo</option>
+                <option value="linked">Vinculados</option>
+              </select>
+            </div>
+          </div>
           <div className="table-wrap linkage-table-wrap">
             <table>
               <thead>
@@ -227,8 +271,13 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
                       selectedEmp === it.employee_id ? 'row--selected' : ''
                     }`}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedEmp(it.employee_id)}
-                    title={it.linked ? `Vinculado → ${it.person_external_id ?? ''}` : 'Sin vínculo'}
+                    onClick={() => {
+                      setSelectedEmp(it.employee_id)
+                      setConfirmOpen(false)
+                    }}
+                    title={
+                      it.linked ? `Vinculado → ${it.person_external_id ?? ''}` : 'Sin vínculo'
+                    }
                   >
                     <td style={{ fontVariantNumeric: 'tabular-nums' }}>{it.cedula}</td>
                     <td>{it.full_name}</td>
@@ -246,7 +295,7 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
                 {items.length === 0 && (
                   <tr>
                     <td colSpan={3} className="empty">
-                      Sin resultados
+                      Sin resultados en GTH
                     </td>
                   </tr>
                 )}
@@ -266,9 +315,29 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
           )}
         </div>
 
-        {/* Columna derecha: IDs biométricos sin vínculo */}
         <div className="linkage-col">
-          <p className="linkage-col__heading">IDs biométricos sin vínculo</p>
+          <p className="linkage-col__heading">2 · IDs biométricos sin vínculo</p>
+          <div className="controls" style={{ marginBottom: '0.75rem' }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label htmlFor="bio-link-q-bio">Buscar ID / nombre en reloj</label>
+              <input
+                id="bio-link-q-bio"
+                value={qBio}
+                onChange={(e) => setQBio(e.target.value)}
+                placeholder="EmployeeNo o nombre…"
+              />
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={busy}
+                onClick={() => void refresh()}
+              >
+                Actualizar
+              </button>
+            </div>
+          </div>
           <div className="table-wrap linkage-table-wrap">
             <table>
               <thead>
@@ -289,6 +358,7 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
                     onClick={() => {
                       setSelectedPerson(p.person_external_id)
                       setManualPersonId('')
+                      setConfirmOpen(false)
                     }}
                   >
                     <td style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -320,6 +390,7 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
               onChange={(e) => {
                 setManualPersonId(e.target.value)
                 if (e.target.value) setSelectedPerson('')
+                setConfirmOpen(false)
               }}
               placeholder="ID del reloj"
             />
@@ -327,7 +398,6 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
         </div>
       </div>
 
-      {/* ── Barra de acción de vínculo ── */}
       <div className="linkage-action">
         <span className="linkage-action__info">
           <strong>
@@ -337,27 +407,77 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
           </strong>
           {' → '}
           <span style={{ color: effectivePerson ? 'var(--accent)' : 'var(--ink-soft)' }}>
-            {effectivePerson || '— ID biométrico —'}
+            {personLabel || '— ID biométrico —'}
           </span>
         </span>
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={busy || !selectedEmp || !effectivePerson}
-          onClick={() => void handleLink()}
-        >
-          Vincular
-        </button>
+        {!confirmOpen ? (
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={busy || !selectedEmp || !effectivePerson}
+            onClick={() => {
+              setError(null)
+              setConfirmOpen(true)
+            }}
+          >
+            Revisar vínculo…
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={busy}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={busy || !selectedEmp || !effectivePerson}
+              onClick={() => void handleLinkConfirmed()}
+            >
+              Confirmar vínculo
+            </button>
+          </div>
+        )}
       </div>
+
+      {confirmOpen && selectedEmpData && effectivePerson && (
+        <div
+          role="region"
+          aria-label="Confirmación de vínculo"
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.9rem 1rem',
+            borderRadius: 10,
+            border: '1px solid var(--border, #444)',
+            background: 'rgba(59,130,246,0.08)',
+            fontSize: '0.9rem',
+          }}
+        >
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600 }}>3 · Confirme antes de guardar</p>
+          <p style={{ margin: 0 }}>
+            Se vinculará <strong>{selectedEmpData.full_name}</strong> (cédula{' '}
+            {selectedEmpData.cedula}) con el ID biométrico <strong>{effectivePerson}</strong>
+            {selectedPersonData?.person_name
+              ? ` (${selectedPersonData.person_name} en el reloj)`
+              : ''}
+            .
+            {selectedEmpData.linked
+              ? ` Este empleado ya tenía el ID ${selectedEmpData.person_external_id}; se reemplazará.`
+              : ''}
+          </p>
+        </div>
+      )}
 
       <hr className="linkage-divider" />
 
-      {/* ── Sección de Presencia ── */}
       <h3 className="linkage-section-title">Presencia por sede GTH</h3>
       <p style={{ fontSize: '0.8rem', color: 'var(--ink-soft)', marginBottom: '1rem' }}>
         Compara empleados activos de <code>hr.employees.site_id</code> con marcajes del día.
-        Requiere vínculos configurados y, idealmente, fila en{' '}
-        <code>biometrico.site_map</code> (sede edge ↔ core.sites).
+        Idealmente exista fila en <code>biometrico.site_map</code> (sede edge ↔ core.sites).
       </p>
 
       <div className="controls">
@@ -371,13 +491,20 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
           />
         </div>
         <div className="field" style={{ minWidth: '280px' }}>
-          <label htmlFor="core-site">UUID sede GTH (core.sites)</label>
-          <input
+          <label htmlFor="core-site">Sede GTH</label>
+          <select
             id="core-site"
             value={coreSiteId}
             onChange={(e) => setCoreSiteId(e.target.value)}
-            placeholder="uuid de la sede"
-          />
+          >
+            <option value="">— Seleccione sede —</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {s.city ? ` (${s.city})` : ''}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="actions">
           <button
@@ -393,7 +520,6 @@ export function PersonLinkagePanel({ biometricSiteId }: Props) {
 
       {presence && (
         <>
-          {/* Stats de presencia */}
           <div className="stats">
             <div className="stat">
               <span className="stat__label">Presentes</span>

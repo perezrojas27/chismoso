@@ -193,4 +193,18 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    try:
+        from edge_app.services.site_identity import load_site_identity
+
+        ident = load_site_identity(s.edge_data_dir or None)
+        if ident:
+            return s.model_copy(
+                update={
+                    "site_code": ident["site_code"],
+                    "site_name": ident["site_name"],
+                }
+            )
+    except Exception:
+        pass
+    return s

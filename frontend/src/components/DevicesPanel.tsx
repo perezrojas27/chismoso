@@ -14,7 +14,13 @@ const EMPTY_FORM = {
 }
 
 function displayName(d: DeviceHealth): string {
-  return (d.location || '').trim() || d.host
+  const loc = (d.location || '').trim()
+  if (loc) return loc
+  return d.host
+}
+
+function siteLabel(d: DeviceHealth): string {
+  return (d.site_code || '').trim() || 'sede sin código'
 }
 
 export function DevicesPanel() {
@@ -261,6 +267,12 @@ export function DevicesPanel() {
                     </span>
                     <span>{displayName(d)}</span>
                   </h3>
+                  {(d.origin === 'agent' || d.site_code) && (
+                    <p className="device-card__endpoint" style={{ opacity: 0.85 }}>
+                      Sede agente: <strong>{siteLabel(d)}</strong>
+                      {d.agent_hostname ? ` · ${d.agent_hostname}` : ''}
+                    </p>
+                  )}
                   <p className="device-card__endpoint">
                     {d.host}
                     <span>:{d.port ?? '—'}</span>

@@ -43,7 +43,9 @@ def list_reported_devices(
                 "device_id": r["device_id"],
                 "host": r["host"] or "",
                 "port": port,
-                "location": (r["site_code"] or r["site_id"] or ""),
+                # Ubicación física del reloj (meta); no confundir con sede del agente
+                "location": (meta.get("location") or "").strip() or None,
+                "site_code": (r["site_code"] or "").strip() or None,
                 "reachable": online,
                 "online": online,
                 "error": None,
@@ -80,7 +82,9 @@ def list_reported_devices(
         "devices_total": len(devices),
         "read_only": True,
         "message": (
-            "Inventario reportado por agentes edge. "
-            "Alta/baja ISAPI se gestiona en el agente de sede."
+            "Inventario reportado por agentes edge (heartbeat). "
+            "La etiqueta «Sede agente» es el SITE_CODE del edge; "
+            "la ubicación del reloj se gestiona en la consola de sede. "
+            "Alta/baja ISAPI se gestiona en el agente."
         ),
     }

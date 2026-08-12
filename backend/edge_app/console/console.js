@@ -331,6 +331,16 @@
       : "Lab abierto (sin clave de consola)";
     $("isapi-user").value = status.isapi_user || "admin";
     $("scan-seed").value = status.scan_seed || "192.168.10.200";
+    $("site-code").value = status.site_code || "";
+    $("site-name").value = status.site_name || "";
+    const siteSrc = status.site_identity_from_file
+      ? "guardada en el agente"
+      : "desde .env / valor por defecto";
+    $("site-hint").textContent =
+      `Código actual: ${status.site_code || "—"} (${siteSrc}).` +
+      (status.has_agent_credential
+        ? " Ya hay credencial hacia INTEGRADO: si cambia el código, puede necesitar re-enrolar."
+        : "");
     $("footer-meta").textContent = `Fuente: ${status.source || "—"} · sede ${status.site_code || "—"}`;
     applyConsoleAuthHints(status);
     await loadDevices();
@@ -424,6 +434,37 @@
       await loadDevices();
     } catch (e) {
       setFeedback("isapi-feedback", e.message, "err");
+      setError(e.message);
+    }
+  });
+
+  $("form-site").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setError(null);
+    setFeedback("site-feedback", null);
+    try {
+      const result = await api("/api/edge-admin/site-identity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          site_code: $("site-code").value.trim(),
+          site_name: $("site-name").value.trim(),
+        }),
+      });
+      const msg = result.warning
+        ? `${result.message} ${result.warning}`
+        : result.message;
+      setFeedback("site-feedback", msg, result.warning ? "err" : "ok");
+      setNotice(msg);
+      $("site-title").textContent = result.site_name || result.site_code;
+      $("footer-meta").textContent = `Fuente: — · sede ${result.site_code || "—"}`;
+      $("site-hint").textContent =
+        `Código actual: ${result.site_code} (guardada en el agente).`;
+      const status = await loadStatus();
+      $("footer-meta").textContent =
+        `Fuente: ${status.source || "—"} · sede ${status.site_code || "—"}`;
+    } catch (e) {
+      setFeedback("site-feedback", e.message, "err");
       setError(e.message);
     }
   });

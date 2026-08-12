@@ -53,6 +53,10 @@ export type DeviceHealth = {
   host: string
   port?: number
   location?: string
+  /** Código de sede del agente edge (cloud inventory). */
+  site_code?: string | null
+  site_id?: string | null
+  agent_hostname?: string | null
   reachable: boolean | null
   auth_ok?: boolean | null
   error: string | null
@@ -372,6 +376,24 @@ export async function linkBioPerson(employeeId: string, personExternalId: string
 export async function unlinkBioPerson(employeeId: string) {
   const res = await apiFetch(`/person-linkage/${encodeURIComponent(employeeId)}/unlink`, {
     method: 'POST',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export type CatalogSite = {
+  id: string
+  name: string
+  city?: string | null
+  address?: string | null
+}
+
+/** Sedes activas GTH (mismo origen portal). */
+export async function fetchCatalogSites(): Promise<CatalogSite[]> {
+  const res = await fetch('/api/auth/catalog/sites', {
+    credentials: 'include',
+    headers: authHeaders(),
+    cache: 'no-store',
   })
   if (!res.ok) throw new Error(await parseError(res))
   return res.json()

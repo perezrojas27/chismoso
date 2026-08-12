@@ -84,12 +84,14 @@ Token de enrollment (lab): el mismo `BIOMETRICO_ENROLLMENT_TOKEN` del `.env` del
 ssh -i ~/.ssh/id_ed25519_albatros_oficina -o IdentitiesOnly=yes jvalor@192.168.10.31
 ```
 
-### Despliegue consola (2026-08-06)
+### Despliegue consola (2026-08-06 · actualizado 2026-08-12)
 
-- Código edge + consola UI actualizados en `C:\AlbatrosEdge\backend`.
-- Servicio `Albatros Edge Service` reinstalado/arrancado (WinSW).
+- Código edge + consola UI en `C:\AlbatrosEdge\backend`.
+- Servicio `Albatros Edge Service` (WinSW).
 - Login consola: usuario `admin` + `EDGE_ADMIN_PASSWORD` (en `C:\AlbatrosEdge\backend\.env`; no en git).
   También se puede cambiar desde la UI («Acceso a esta consola» → `data/console_auth.json`).
+- **Oficina / sede (2026-08-12):** panel en consola para `SITE_CODE` / `SITE_NAME`
+  (`data/site_identity.json` + sync `.env`). Un agente = una sede geográfica.
 - Acciones UI: editar dispositivo, probar ISAPI, quitar del registro managed.
 - Si `http://192.168.10.31:8003/` no abre desde otra VLAN, usar túnel:
 
@@ -98,6 +100,19 @@ ssh -i ~/.ssh/id_ed25519_albatros_oficina -o IdentitiesOnly=yes \
   -L 18003:127.0.0.1:8003 jvalor@192.168.10.31
 # luego: http://127.0.0.1:18003/
 ```
+
+Actualizar código desde el monorepo (lab):
+
+```bash
+# Desde Proyecto Login / INTEGRADO
+rsync -az -e "ssh -i ~/.ssh/id_ed25519_albatros_oficina -o IdentitiesOnly=yes" \
+  modulos/biometrico/backend/edge_app/ \
+  modulos/biometrico/backend/shared/ \
+  jvalor@192.168.10.31:'/c/AlbatrosEdge/backend/'
+# Reiniciar servicio WinSW en BIO2 (PowerShell admin o winsw restart)
+```
+
+Plan multi-sucursal: [`PLAN_EDGE_MULTISEDE_BIOMETRICO.md`](../../../docs/guias/PLAN_EDGE_MULTISEDE_BIOMETRICO.md).
 
 En el lab portal: **no** levantar perfil `biometrico-edge-lab` (evitar dos agentes).  
 Plan futuro preferido: Raspberry Pi / Linux dedicado en la misma LAN.

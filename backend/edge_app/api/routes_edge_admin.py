@@ -131,14 +131,19 @@ async def require_edge_console_auth(
 @router.get("/status")
 def console_status(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
     from edge_app.services.console_auth_secrets import load_console_auth
+    from edge_app.services.site_identity import load_site_identity
 
     pwd = _admin_password(settings)
     isapi_pwd = (settings.effective_hikvision_password() or "").strip()
     stored = load_console_auth(settings.edge_data_dir or None)
+    site_file = load_site_identity(settings.edge_data_dir or None)
     return {
         "console": "biometrico-edge",
         "site_code": settings.site_code,
         "site_name": settings.site_name,
+        "site_identity_from_file": bool(site_file),
+        "has_agent_credential": bool((settings.agent_credential or "").strip()),
+        "integrado_base_url": (settings.integrado_base_url or "").strip(),
         "auth_required": bool(pwd),
         "default_username": _admin_user(settings),
         "console_auth_from_file": bool(stored),
@@ -147,6 +152,70 @@ def console_status(settings: Settings = Depends(get_settings)) -> dict[str, Any]
         "source": settings.source,
         "hikvision_use_https": settings.hikvision_use_https,
         "scan_seed": (settings.edge_scan_seed_host or settings.hikvision_host or "").strip(),
+    }
+
+
+class SiteIdentityBody(BaseModel):
+    site_code: str = Field(min_length=2, max_length=63)
+    site_name: str = Field(default="", max_length=120)
+
+
+@router.post("/site-identity")
+def save_site_identity_endpoint(
+    body: SiteIdentityBody,
+    _: dict = Depends(require_edge_console_auth),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """Fija la oficina/sede de este agente (persiste JSON + SITE_* en .env)."""
+    from pathlib import Path
+
+    from edge_app.services.site_identity import (
+        save_site_identity,
+        sync_env_site_identity,
+        validate_site_code,
+    )
+
+    try:
+        code = validate_site_code(body.site_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    name = (body.site_name or "").strip() or code.replace("_", " ").title()
+    previous = (settings.site_code or "").strip()
+    enrolled = bool((settings.agent_credential or "").strip())
+    warning = None
+    if enrolled and previous and previous != code:
+        warning = (
+            "Este agente ya tiene credencial hacia INTEGRADO con otro código de sede. "
+            "Tras cambiar, conviene re-enrolar o verificar que el cloud acepte el nuevo site_code."
+        )
+
+    data_dir = (settings.edge_data_dir or "").strip() or None
+    try:
+        saved_path = save_site_identity(code, name, data_dir)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"No se pudo guardar la sede: {exc}",
+        ) from exc
+
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    env_synced = sync_env_site_identity(code, name, env_path=env_path)
+
+    try:
+        get_settings.cache_clear()
+    except Exception:
+        pass
+
+    return {
+        "message": "Sede del agente actualizada.",
+        "site_code": code,
+        "site_name": name,
+        "saved": True,
+        "identity_file": saved_path.name,
+        "env_synced": env_synced,
+        "warning": warning,
+        "previous_site_code": previous or None,
     }
 
 

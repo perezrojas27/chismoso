@@ -50,6 +50,27 @@
       <div class="grid">
         <aside class="side-stack">
           <div class="panel">
+            <h2>Oficina / sede de este agente</h2>
+            <p class="muted">
+              Identifica <strong>qué sucursal</strong> reporta este PC a INTEGRADO.
+              No es la ubicación física del reloj (esa se define por dispositivo).
+              Un agente = una sede (<code>SITE_CODE</code>).
+            </p>
+            <form id="form-site">
+              <label>Código sede
+                <input id="site-code" required pattern="[a-z0-9][a-z0-9_]{1,62}"
+                       placeholder="ej. oficina_central" autocomplete="off" />
+              </label>
+              <label>Nombre visible
+                <input id="site-name" required placeholder="ej. Torre Sindoni (oficina central)" />
+              </label>
+              <button type="submit" class="btn primary">Guardar sede</button>
+            </form>
+            <p id="site-hint" class="muted"></p>
+            <p id="site-feedback" class="feedback" hidden></p>
+          </div>
+
+          <div class="panel">
             <h2>Credenciales del reloj</h2>
             <p class="muted">
               Usuario y clave <strong>ISAPI</strong> del terminal Hikvision.
