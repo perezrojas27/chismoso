@@ -6,7 +6,6 @@ import {
   fetchCafeteriaPdfBlob,
   fetchHealth,
   fetchSites,
-  formatDate,
   type AttendanceReport,
   type CafeteriaReport,
   type HealthResponse,
