@@ -356,6 +356,33 @@ def heartbeat(
             },
         )
 
+    reported_device_ids = [
+        str(dev.get("device_id") or "").strip()
+        for dev in body.devices
+        if str(dev.get("device_id") or "").strip()
+    ]
+    if reported_device_ids:
+        db.execute(
+            text(
+                """
+                DELETE FROM biometrico.agent_devices
+                WHERE site_id = :site_id
+                  AND device_id != ALL(:reported)
+                """
+            ),
+            {"site_id": site_id, "reported": reported_device_ids},
+        )
+    else:
+        db.execute(
+            text(
+                """
+                DELETE FROM biometrico.agent_devices
+                WHERE site_id = :site_id
+                """
+            ),
+            {"site_id": site_id},
+        )
+
     db.commit()
     return {
         "ok": True,

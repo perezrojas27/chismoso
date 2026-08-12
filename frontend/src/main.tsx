@@ -4,6 +4,7 @@ import App from './App'
 import { ensureSession } from './portalAuth'
 import './styles/tokens-diseno-albatros.css'
 import './styles/admin-shell.css'
+import './styles/liquid-glass.css'
 
 if (!ensureSession()) {
   // redirectIfNoToken / sin acceso ya manejó la salida
