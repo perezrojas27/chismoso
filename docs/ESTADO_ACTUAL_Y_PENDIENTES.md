@@ -1,34 +1,19 @@
 # Estado actual y pendientes — Biométricos (Agosto 2026)
 
 Documento vivo del módulo en el **repo producto** (chismoso / Albatros Biométrico).  
-En el monorepo: `docs/modulos/MODULO_BIOMETRICO.md`.
+**Canónico operativo (labs / edge):** monorepo INTEGRADO → `modulos/biometrico/docs/ESTADO_ACTUAL_Y_PENDIENTES.md`
 
-## Hecho
+## Hecho (sync 2026-08-14)
 
-- Refactor `edge_app` / `cloud_app` / `shared` + `client_id=biometrico`.
-- Cloud + SPA en labs INTEGRADO (oficina `:8090`, casero `:8080`).
-- **Modelo desacoplado:** edge en sede; portal no es dueño de ISAPI.
-- **Consola de sede** (`:8003`): login TI, ISAPI, detectar / **editar** / **probar** / quitar; cambio de clave de consola (`console_auth.json`) — sync 2026-08-12.
-- Edge **no** en compose portal por defecto (`biometrico-edge-lab` opcional).
-- Windows `192.168.10.31`: `C:\AlbatrosEdge` + WinSW `albatros-edge`.
-- Compose independiente: `docker-compose.edge-sede.yml`.
-- Vínculo GTH: `person_links` + UI/API.
-- Nota: grupos geo del biométrico **no** sincronizados (no sustituyen `person_links`).
+- Edge Torre Sindoni en Raspberry `192.168.105.21:8003`; BIO2 edge retirado.
+- Dispositivos managed; ubicaciones sin defaults; Digest/sync; backfill lab.
+- Comedor/PDF: excepciones aplicadas; columna Comentario + zebra; presencia GTH/`site_map`.
 
 ## Pendiente
 
-1. Roles biométrico en Grupos (Admin labs) + UAT humano.
-2. UAT marcajes / comedor / PDF con agente sede estable.
-3. Firewall `:8003` entre VLANs o solo túnel SSH.
-4. PoC Raspberry Pi como agente.
-5. Auto-vínculo si `employeeNo` ≈ cédula; sync grupos geo (opcional).
-6. Deploy prod — solo tras UAT + OK.
-
-## Docs locales
-
-- `ARQUITECTURA_EDGE_CLOUD.md` · `INSTALACION_AGENTE_SEDE.md` · `ISAPI_ENDPOINTS.md`
-- `VINCULO_GTH_BIOMETRICO.md` · `GUIA_COLABORADOR_ASISTENCIA_ISAPI_MULTI_SEDE.md`
+1. Export/sync código vivo monorepo → este repo cuando corresponda.
+2. Más `person_links` Torre; UAT humano; roles Grupos; prod solo con OK.
 
 ---
 
-*Actualizado 2026-08-12 — sync desacoplado + consola ampliada*
+*Actualizado 2026-08-14 — alineado a monorepo INTEGRADO*
